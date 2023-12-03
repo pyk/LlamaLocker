@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - uses: pnpm/action-setup@v2
         with:
           version: 8
@@ -20,5 +22,11 @@ jobs:
         with:
           node-version: "21.2.0"
           cache: "pnpm"
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
       - run: pnpm install
       - run: pnpm check
+      - run: forge --version
+      - run: forge build --sizes
+      - run: forge test -vvv
