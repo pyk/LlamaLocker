@@ -1,0 +1,12 @@
+{
+  "name": "sllama",
+  "scripts": {
+    "check": "prettier --check . && solhint 'contracts/**/*.sol'",
+    "fix": "prettier --write ."
+  },
+  "devDependencies": {
+    "prettier": "3.1.0",
+    "prettier-plugin-solidity": "1.2.0",
+    "solhint": "4.0.0"
+  }
+}
