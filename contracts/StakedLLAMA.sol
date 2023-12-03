@@ -22,8 +22,8 @@ contract StakedLLAMA is Ownable2Step {
   IERC721 public nft;
   mapping(IERC20 => RewardTokenData) private rewardTokenData;
 
-  error RewardExists();
-  error RewardInvalid();
+  error RewardTokenExists();
+  error RewardTokenInvalid();
 
   event RewardTokenAdded(IERC20 rewardToken);
 
@@ -40,8 +40,8 @@ contract StakedLLAMA is Ownable2Step {
   }
 
   function addRewardToken(IERC20 rewardToken_) external onlyOwner {
-    if (rewardTokenData[IERC20(rewardToken_)].lastUpdateTime > 0) revert RewardExists();
-    if (address(rewardToken_) == address(this) || address(rewardToken_) == address(nft)) revert RewardInvalid();
+    if (rewardTokenData[IERC20(rewardToken_)].lastUpdateTime > 0) revert RewardTokenExists();
+    if (address(rewardToken_) == address(this) || address(rewardToken_) == address(nft)) revert RewardTokenInvalid();
 
     rewardTokens.push(IERC20(rewardToken_));
     rewardTokenData[rewardToken_].lastUpdateTime = block.timestamp;
