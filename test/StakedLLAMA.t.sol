@@ -27,6 +27,17 @@ contract StakedLLAMATest is Test {
     sLLAMA.addRewardToken(crv);
   }
 
+  function testFail_AddRewardTokenExists() public {
+    vm.startPrank(owner);
+    sLLAMA.addRewardToken(crv);
+    sLLAMA.addRewardToken(crv);
+  }
+
+  function testFail_AddRewardTokenInvalidZero() public {
+    vm.startPrank(owner);
+    sLLAMA.addRewardToken(IERC20(address(0)));
+  }
+
   function test_AddRewardAsOwner() public {
     vm.startPrank(owner);
     sLLAMA.addRewardToken(crv);

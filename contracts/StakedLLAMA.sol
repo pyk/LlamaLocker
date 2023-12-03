@@ -40,8 +40,8 @@ contract StakedLLAMA is Ownable2Step {
   }
 
   function addRewardToken(IERC20 rewardToken_) external onlyOwner {
+    if (address(rewardToken_) == address(0)) revert RewardTokenInvalid();
     if (rewardTokenData[IERC20(rewardToken_)].lastUpdateTime > 0) revert RewardTokenExists();
-    if (address(rewardToken_) == address(this) || address(rewardToken_) == address(nft)) revert RewardTokenInvalid();
 
     rewardTokens.push(IERC20(rewardToken_));
     rewardTokenData[rewardToken_].lastUpdateTime = block.timestamp;
