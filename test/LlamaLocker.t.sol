@@ -68,16 +68,49 @@ contract LlamaLockerTest is Test {
   function test_LockNFTTransferred() public {
     uint256 tokenId1 = nft.mint(alice);
     uint256 tokenId2 = nft.mint(alice);
-
-    vm.startPrank(alice);
-    nft.setApprovalForAll(address(locker), true);
     uint256[] memory tokenIds = new uint256[](2);
     tokenIds[0] = tokenId1;
     tokenIds[1] = tokenId2;
+
+    vm.startPrank(alice);
+    nft.setApprovalForAll(address(locker), true);
     locker.lock(tokenIds);
     vm.stopPrank();
 
     assertEq(nft.ownerOf(tokenId1), address(locker));
     assertEq(nft.ownerOf(tokenId2), address(locker));
+  }
+
+  function testFail_UnlockInvalidOwner() public {
+    uint256 tokenId1 = nft.mint(alice);
+    uint256 tokenId2 = nft.mint(alice);
+    uint256[] memory tokenIds = new uint256[](2);
+    tokenIds[0] = tokenId1;
+    tokenIds[1] = tokenId2;
+
+    vm.startPrank(alice);
+    nft.setApprovalForAll(address(locker), true);
+    locker.lock(tokenIds);
+    vm.stopPrank();
+
+    vm.startPrank(owner);
+    locker.unlock(tokenIds);
+  }
+
+  function test_UnlockNFTTransfered() public {
+    uint256 tokenId1 = nft.mint(alice);
+    uint256 tokenId2 = nft.mint(alice);
+    uint256[] memory tokenIds = new uint256[](2);
+    tokenIds[0] = tokenId1;
+    tokenIds[1] = tokenId2;
+
+    vm.startPrank(alice);
+    nft.setApprovalForAll(address(locker), true);
+    locker.lock(tokenIds);
+    locker.unlock(tokenIds);
+    vm.stopPrank();
+
+    assertEq(nft.ownerOf(tokenId1), alice);
+    assertEq(nft.ownerOf(tokenId2), alice);
   }
 }
