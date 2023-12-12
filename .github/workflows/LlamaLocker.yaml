@@ -1,4 +1,4 @@
-name: "sLLAMA"
+name: "LlamaLocker"
 
 on:
   push:

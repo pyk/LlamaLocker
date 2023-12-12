@@ -35,6 +35,11 @@ contract LlamaLockerTest is Test {
     locker = new LlamaLocker(owner, address(nft));
   }
 
+  function testFail_renounceOwnership() public {
+    vm.startPrank(owner);
+    locker.renounceOwnership();
+  }
+
   function testFail_AddRewardTokenAsNonOwner() public {
     locker.addRewardToken(crv);
   }
@@ -56,7 +61,7 @@ contract LlamaLockerTest is Test {
 
     assertEq(locker.rewardTokensCount(), 1);
     LlamaLocker.RewardTokenData memory data = locker.getRewardTokenData(crv);
-    assertEq(data.lastUpdateTime, block.timestamp);
+    assertEq(data.lastUpdatedAt, block.timestamp);
     assertEq(data.periodFinish, block.timestamp);
   }
 
