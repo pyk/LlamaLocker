@@ -28,6 +28,7 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
   mapping(uint256 tokenId => address owner) private nftOwners;
   uint256 public constant REWARD_DURATION = 7 days;
 
+  error RenounceInvalid();
   error RewardTokenExists();
   error RewardTokenInvalid();
   error RewardAmountInvalid();
@@ -38,6 +39,11 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
 
   constructor(address owner_, address nft_) Ownable(owner_) {
     nft = IERC721(nft_);
+  }
+
+  /// @dev This contract ain't gonna work without its owner, ya know?
+  function renounceOwnership() public virtual override onlyOwner {
+    revert RenounceInvalid();
   }
 
   function rewardTokensCount() external view returns (uint256 count_) {
