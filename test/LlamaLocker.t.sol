@@ -40,6 +40,10 @@ contract LlamaLockerTest is Test {
     locker.renounceOwnership();
   }
 
+  // ☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+  //                         Add Reward Token
+  // ☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+
   function testFail_AddRewardTokenAsNonOwner() public {
     locker.addRewardToken(crv);
   }
@@ -55,15 +59,54 @@ contract LlamaLockerTest is Test {
     locker.addRewardToken(IERC20(address(0)));
   }
 
-  function test_AddRewardAsOwner() public {
+  function test_AddRewardTokenStates() public {
     vm.startPrank(owner);
     locker.addRewardToken(crv);
 
-    assertEq(locker.rewardTokensCount(), 1);
-    LlamaLocker.RewardTokenData memory data = locker.getRewardTokenData(crv);
-    assertEq(data.lastUpdatedAt, block.timestamp);
-    assertEq(data.periodFinish, block.timestamp);
+    LlamaLocker.RewardState memory states = locker.getRewardState(crv);
+    assertEq(states.updatedAt, block.timestamp);
+    assertEq(states.endAt, block.timestamp);
+    assertEq(states.rewardPerSecond, 0);
+    assertEq(states.rewardPerTokenStored, 0);
+
+    assertEq(locker.getRewardTokenCount(), 1);
   }
+
+  // function test_AddRewardAsOwner() public {
+  //   vm.startPrank(owner);
+  //   locker.addRewardToken(crv);
+
+  //   assertEq(locker.rewardTokensCount(), 1);
+  //   LlamaLocker.RewardTokenData memory data = locker.getRewardTokenData(crv);
+  //   assertEq(data.lastUpdatedAt, block.timestamp);
+  //   assertEq(data.periodFinish, block.timestamp);
+  // }
+
+  // function testFail_AddRewardAsNonOwner() public {
+  //   locker.addReward(crv, 1 ether);
+  // }
+
+  // function testFail_AddRewardWithInvalidAmount() public {
+  //   vm.startPrank(owner);
+  //   locker.addRewardToken(crv);
+  //   locker.addReward(crv, 0 ether);
+  // }
+
+  // function testFail_AddRewardWithInvalidToken() public {
+  //   vm.startPrank(owner);
+  //   locker.addReward(crv, 1 ether);
+  // }
+
+  // function test_AddRewardOncePerEpoch() public {
+  //   vm.startPrank(owner);
+  //   locker.addRewardToken(crv);
+  //   locker.addReward(crv, 1 ether);
+
+  //   LlamaLocker.RewardTokenData memory data = locker.getRewardTokenData(crv);
+  //   assertEq(data.periodFinish, block.timestamp + locker.REWARD_DURATION());
+  //   assertEq(data.rewardPerSecond, 1 ether / locker.REWARD_DURATION());
+  //   assertEq(data.lastUpdatedAt, block.timestamp);
+  // }
 
   function testFail_LockZeroToken() public {
     uint256[] memory tokenIds = new uint256[](0);
