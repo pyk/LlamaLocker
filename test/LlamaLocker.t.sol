@@ -35,8 +35,9 @@ contract LlamaLockerTest is Test {
     locker = new LlamaLocker(owner, address(nft));
   }
 
-  function testFail_renounceOwnership() public {
+  function testRenounceOwnershipRevert() public {
     vm.startPrank(owner);
+    vm.expectRevert(abi.encodeWithSelector(LlamaLocker.RenounceInvalid.selector));
     locker.renounceOwnership();
   }
 

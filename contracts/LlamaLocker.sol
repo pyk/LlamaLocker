@@ -53,15 +53,15 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
   }
 
   /**************************************************************/
-  //                    Reward Token Manager                    //
+  /*                    Reward Token Manager                    */
   /**************************************************************/
 
   function getRewardTokenCount() external view returns (uint256 count_) {
     count_ = rewardTokens.length;
   }
 
-  function getRewardState(IERC20 rewardToken_) external view returns (RewardState memory data_) {
-    data_ = rewardStates[rewardToken_];
+  function getRewardState(IERC20 token_) external view returns (RewardState memory data_) {
+    data_ = rewardStates[token_];
   }
 
   function addRewardToken(IERC20 token_) external onlyOwner {
@@ -75,7 +75,7 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
     emit RewardTokenAdded(token_);
   }
 
-  // /// @notice Owner can add reward on weekly basis (vlCVX styles)
+  // /// @notice Owner can add reward 7on weekly basis (vlCVX styles)
   // function addReward(IERC20 rewardToken_, uint256 amount_) external onlyOwner {
   //   if (amount_ == 0) revert RewardAmountInvalid();
   //   if (rewardStates[IERC20(rewardToken_)].lastUpdatedAt == 0) revert RewardTokenInvalid();
