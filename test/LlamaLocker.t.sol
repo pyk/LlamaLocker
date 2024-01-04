@@ -4,6 +4,7 @@ pragma solidity 0.8.23;
 import {Test, console2} from "forge-std/Test.sol";
 import {IERC721, ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 import {LlamaLocker} from "contracts/LlamaLocker.sol";
 
@@ -45,7 +46,8 @@ contract LlamaLockerTest is Test {
   //                         Add Reward Token
   // ☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 
-  function testFail_AddRewardTokenAsNonOwner() public {
+  function testAddRewardTokenAsNonOwnerRevert() public {
+    vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, address(this)));
     locker.addRewardToken(crv);
   }
 
