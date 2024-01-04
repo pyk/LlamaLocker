@@ -51,18 +51,21 @@ contract LlamaLockerTest is Test {
     locker.addRewardToken(crv);
   }
 
-  function testFail_AddRewardTokenExists() public {
+  function testAddRewardTokenExistsRevert() public {
     vm.startPrank(owner);
     locker.addRewardToken(crv);
+
+    vm.expectRevert(abi.encodeWithSelector(LlamaLocker.RewardTokenExists.selector));
     locker.addRewardToken(crv);
   }
 
-  function testFail_AddRewardTokenInvalidZero() public {
+  function testAddRewardTokenInvalidZero() public {
     vm.startPrank(owner);
+    vm.expectRevert(abi.encodeWithSelector(LlamaLocker.RewardTokenInvalid.selector));
     locker.addRewardToken(IERC20(address(0)));
   }
 
-  function test_AddRewardTokenStates() public {
+  function testAddRewardTokenStates() public {
     vm.startPrank(owner);
     locker.addRewardToken(crv);
 
@@ -111,12 +114,14 @@ contract LlamaLockerTest is Test {
   //   assertEq(data.lastUpdatedAt, block.timestamp);
   // }
 
-  function testFail_LockZeroToken() public {
+  function testLockNFTZeroToken() public {
     uint256[] memory tokenIds = new uint256[](0);
+
+    vm.expectRevert(abi.encodeWithSelector(LlamaLocker.LockZeroToken.selector));
     locker.lock(tokenIds);
   }
 
-  function test_LockNFTTransferred() public {
+  function testLockNFTTransferred() public {
     uint256 tokenId1 = nft.mint(alice);
     uint256 tokenId2 = nft.mint(alice);
     uint256[] memory tokenIds = new uint256[](2);
@@ -132,7 +137,7 @@ contract LlamaLockerTest is Test {
     assertEq(nft.ownerOf(tokenId2), address(locker));
   }
 
-  function testFail_UnlockInvalidOwner() public {
+  function testUnlockNFTInvalidOwner() public {
     uint256 tokenId1 = nft.mint(alice);
     uint256 tokenId2 = nft.mint(alice);
     uint256[] memory tokenIds = new uint256[](2);
@@ -145,10 +150,11 @@ contract LlamaLockerTest is Test {
     vm.stopPrank();
 
     vm.startPrank(owner);
+    vm.expectRevert(abi.encodeWithSelector(LlamaLocker.UnlockOwnerInvalid.selector));
     locker.unlock(tokenIds);
   }
 
-  function test_UnlockNFTTransfered() public {
+  function testUnlockNFTTransfered() public {
     uint256 tokenId1 = nft.mint(alice);
     uint256 tokenId2 = nft.mint(alice);
     uint256[] memory tokenIds = new uint256[](2);
