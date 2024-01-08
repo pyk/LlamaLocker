@@ -6,7 +6,7 @@ import {IERC721, ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
-import {LlamaLocker} from "contracts/LlamaLocker.sol";
+import {LlamaLocker} from "@src/LlamaLocker.sol";
 
 contract NFT is ERC721 {
     uint256 private _nextTokenId;
