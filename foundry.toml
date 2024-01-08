@@ -5,9 +5,9 @@ libs = ["lib"]
 solc = "0.8.23"
 evm_version = "paris"
 remappings = [
-  "contracts/=contracts/",
+  "@src/=src/",
   "@std/=lib/forge-std/src/",
-  "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+  "@openzeppelin/=lib/openzeppelin-contracts/contracts/"
 ]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

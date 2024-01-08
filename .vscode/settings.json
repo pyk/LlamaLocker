@@ -7,4 +7,5 @@
   },
   "solidity.formatter": "forge",
   "solidity.compileUsingRemoteVersion": "v0.8.23",
+  "solidity.linter": "solhint"
 }

@@ -2,9 +2,9 @@
 pragma solidity 0.8.23;
 
 import {Test, console2} from "forge-std/Test.sol";
-import {IERC721, ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {IERC721, ERC721} from "@openzeppelin/token/ERC721/ERC721.sol";
+import {IERC20} from "@openzeppelin/token/ERC20/ERC20.sol";
+import {Ownable} from "@openzeppelin/access/Ownable2Step.sol";
 
 import {LlamaLocker} from "@src/LlamaLocker.sol";
 
@@ -25,12 +25,12 @@ contract NFT is ERC721 {
  * @dev Testing for LLAMA's locker contract
  */
 contract LlamaLockerTest is Test {
-    LlamaLocker locker;
+    LlamaLocker private locker;
 
-    address owner = vm.addr(0x11A);
-    address alice = vm.addr(0xA11CE);
-    NFT nft = new NFT();
-    IERC20 crv = IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
+    address private owner = vm.addr(0x11A);
+    address private alice = vm.addr(0xA11CE);
+    NFT private nft = new NFT();
+    IERC20 private crv = IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
 
     function setUp() public {
         locker = new LlamaLocker(owner, address(nft));

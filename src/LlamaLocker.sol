@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.23;
+pragma solidity ^0.8.23;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import {ERC721Holder} from "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
-import {Ownable, Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {IERC20} from "@openzeppelin/token/ERC20/ERC20.sol";
+import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
+import {IERC721} from "@openzeppelin/token/ERC721/ERC721.sol";
+import {ERC721Holder} from "@openzeppelin/token/ERC721/utils/ERC721Holder.sol";
+import {Ownable, Ownable2Step} from "@openzeppelin/access/Ownable2Step.sol";
+import {Math} from "@openzeppelin/utils/math/Math.sol";
+import {SafeCast} from "@openzeppelin/utils/math/SafeCast.sol";
 
 /**
  * @title Llama Locker
