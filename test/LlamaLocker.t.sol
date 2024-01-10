@@ -59,12 +59,6 @@ contract LlamaLockerTest is Test {
         locker.addRewardToken(crv);
     }
 
-    function testAddRewardTokenInvalidZero() public {
-        vm.startPrank(owner);
-        vm.expectRevert(abi.encodeWithSelector(LlamaLocker.RewardTokenInvalid.selector));
-        locker.addRewardToken(IERC20(address(0)));
-    }
-
     function testAddRewardTokenStates() public {
         vm.startPrank(owner);
         locker.addRewardToken(crv);

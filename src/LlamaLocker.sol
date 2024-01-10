@@ -17,25 +17,29 @@ import {SafeCast} from "@openzeppelin/utils/math/SafeCast.sol";
 contract LlamaLocker is ERC721Holder, Ownable2Step {
     using SafeERC20 for IERC20;
     using SafeCast for uint256;
-
     using Math for uint256;
 
+    //************************************************************//
+    //                 Storage for Reward Tokens                  //
+    //************************************************************//
+
+    // TODO(pyk): explain these fields
     struct RewardState {
-        uint32 endAt;
-        uint32 updatedAt;
-        uint256 rewardPerSecond;
-        uint256 rewardPerTokenStored;
+        uint48 endAt;
+        uint208 rewardPerSecond;
+        uint48 updatedAt;
+        uint208 rewardPerTokenStored;
     }
 
     IERC20[] public rewardTokens;
-    IERC721 public nft;
     mapping(IERC20 => RewardState) private rewardStates;
+
+    IERC721 public nft;
     mapping(uint256 tokenId => address owner) private nftOwners;
     uint256 public constant REWARD_DURATION = 7 days;
 
     error RenounceInvalid();
     error RewardTokenExists();
-    error RewardTokenInvalid();
     error RewardAmountInvalid();
     error LockZeroToken();
     error UnlockOwnerInvalid();
@@ -64,15 +68,16 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
         data_ = rewardStates[token_];
     }
 
-    function addRewardToken(IERC20 token_) external onlyOwner {
-        if (address(token_) == address(0)) revert RewardTokenInvalid();
-        if (rewardStates[token_].updatedAt > 0) revert RewardTokenExists();
+    /// @notice Add new reward token
+    /// @param _token New reward token address
+    function addRewardToken(IERC20 _token) external onlyOwner {
+        if (rewardStates[_token].updatedAt > 0) revert RewardTokenExists();
 
-        rewardTokens.push(token_);
-        rewardStates[token_].updatedAt = block.timestamp.toUint32();
-        rewardStates[token_].endAt = block.timestamp.toUint32();
+        rewardTokens.push(_token);
+        rewardStates[_token].updatedAt = block.timestamp.toUint48();
+        rewardStates[_token].endAt = block.timestamp.toUint48();
 
-        emit RewardTokenAdded(token_);
+        emit RewardTokenAdded(_token);
     }
 
     // /// @notice Owner can add reward 7on weekly basis (vlCVX styles)
