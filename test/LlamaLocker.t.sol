@@ -155,6 +155,9 @@ contract LlamaLockerTest is Test {
         assertEq(rewardState.periodEndAt, 1702908896); // block.timestamp + REWARD_DURATION
         assertEq(rewardState.rewardPerSecond, 49589505298003974); // 0.04 CRV per second
         assertEq(rewardState.rewardPerNFTStored, 8267195767195767000); // 8.267 CRV per locked NFT
+
+        // Check distributed CRV
+        assertEq(crv.balanceOf(address(locker)), 30_000 ether);
     }
 
     //************************************************************//
