@@ -40,6 +40,7 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
 
     error RenounceInvalid();
     error RewardTokenExists();
+    error RewardTokenNotExists();
     error RewardAmountInvalid();
     error LockZeroToken();
     error UnlockOwnerInvalid();
@@ -80,25 +81,14 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
         emit RewardTokenAdded(_token);
     }
 
-    // /// @notice Owner can add reward 7on weekly basis (vlCVX styles)
-    // function addReward(IERC20 rewardToken_, uint256 amount_) external onlyOwner {
-    //   if (amount_ == 0) revert RewardAmountInvalid();
-    //   if (rewardStates[IERC20(rewardToken_)].lastUpdatedAt == 0) revert RewardTokenInvalid();
-
-    //   RewardState storage data = rewardStates[rewardToken_];
-    //   if (block.timestamp >= data.periodFinish) {
-    //     data.rewardPerSecond = amount_ / REWARD_DURATION;
-    //   } else {
-    //     uint256 remainingSeconds = data.periodFinish - block.timestamp;
-    //     uint256 leftoverAmount = remainingSeconds * data.rewardPerSecond;
-    //     data.rewardPerSecond = (amount_ + leftoverAmount) / REWARD_DURATION;
-    //   }
-    //   data.lastUpdatedAt = block.timestamp;
-    //   data.periodFinish = block.timestamp + REWARD_DURATION;
-
-    //   rewardToken_.safeTransferFrom(msg.sender, address(this), amount_);
-    //   emit RewardAdded(rewardToken_, amount_);
-    // }
+    /// @notice Distribute rewards to lockers
+    /// @param _token The reward token address
+    /// @param _amount The amount of reward token
+    function distribute(IERC20 _token, uint256 _amount) external onlyOwner {
+        if (rewardStates[_token].updatedAt == 0) revert RewardTokenNotExists();
+        if (_amount == 0) revert RewardAmountInvalid();
+        //
+    }
 
     function lock(uint256[] calldata tokenIds_) external {
         uint256 tokenCount = tokenIds_.length;

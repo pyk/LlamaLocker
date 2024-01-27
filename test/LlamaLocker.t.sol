@@ -72,6 +72,29 @@ contract LlamaLockerTest is Test {
         assertEq(locker.getRewardTokenCount(), 1);
     }
 
+    //************************************************************//
+    //                     Distribute Reward                      //
+    //************************************************************//
+
+    function testDistributeAsNonOwnerRevert() public {
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, address(this)));
+        locker.distribute(crv, 1 ether);
+    }
+
+    function testDistributeTokenNotExistsRevert() public {
+        vm.startPrank(owner);
+        vm.expectRevert(abi.encodeWithSelector(LlamaLocker.RewardTokenNotExists.selector));
+        locker.distribute(crv, 1 ether);
+    }
+
+    function testDistributeAmountInvalidRevert() public {
+        vm.startPrank(owner);
+        locker.addRewardToken(crv);
+
+        vm.expectRevert(abi.encodeWithSelector(LlamaLocker.RewardAmountInvalid.selector));
+        locker.distribute(crv, 0);
+    }
+
     // function test_AddRewardAsOwner() public {
     //   vm.startPrank(owner);
     //   locker.addRewardToken(crv);
