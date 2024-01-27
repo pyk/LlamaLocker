@@ -1,6 +1,3 @@
 {
-  "recommendations": [
-    "JuanBlanco.solidity",
-    "tintinweb.solidity-metrics"
-  ]
+  "recommendations": ["JuanBlanco.solidity", "tintinweb.solidity-metrics"]
 }
