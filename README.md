@@ -1,4 +1,4 @@
-## Llama Locker v0
+# Llama Locker v0
 
 Overview:
 
@@ -19,3 +19,23 @@ User:
   Thursday)
 - User will be eligible to claim share of the rewards on the next epoch
 - User can unlock their llamas via `unlock(tokenIds)`
+
+## Getting started
+
+Make sure to use latest version of foundry:
+
+```shell
+foundryup
+```
+
+Install dependencies:
+
+```shell
+forge install
+```
+
+Run the tests:
+
+```shell
+forge test
+```
