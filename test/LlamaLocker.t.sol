@@ -4,6 +4,7 @@ pragma solidity 0.8.23;
 import {Test, console2} from "forge-std/Test.sol";
 import {IERC721, ERC721} from "@openzeppelin/token/ERC721/ERC721.sol";
 import {IERC20} from "@openzeppelin/token/ERC20/ERC20.sol";
+import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/access/Ownable2Step.sol";
 
 import {LlamaLocker} from "@src/LlamaLocker.sol";
@@ -25,6 +26,8 @@ contract NFT is ERC721 {
  * @dev Testing for LLAMA's locker contract
  */
 contract LlamaLockerTest is Test {
+    using SafeERC20 for IERC20;
+
     LlamaLocker private locker;
 
     address private owner = vm.addr(0x11A);
@@ -65,9 +68,9 @@ contract LlamaLockerTest is Test {
 
         LlamaLocker.RewardState memory states = locker.getRewardState(crv);
         assertEq(states.updatedAt, block.timestamp);
-        assertEq(states.endAt, block.timestamp);
+        assertEq(states.periodEndAt, block.timestamp);
         assertEq(states.rewardPerSecond, 0);
-        assertEq(states.rewardPerTokenStored, 0);
+        assertEq(states.rewardPerNFTStored, 0);
 
         assertEq(locker.getRewardTokenCount(), 1);
     }
@@ -103,41 +106,56 @@ contract LlamaLockerTest is Test {
         locker.distribute(crv, 1 ether);
     }
 
-    // function test_AddRewardAsOwner() public {
-    //   vm.startPrank(owner);
-    //   locker.addRewardToken(crv);
+    function testDistributeReward() public {
+        uint256 blockTimestamp = 1702302996;
+        vm.warp(blockTimestamp);
 
-    //   assertEq(locker.rewardTokensCount(), 1);
-    //   LlamaLocker.RewardTokenData memory data = locker.getRewardTokenData(crv);
-    //   assertEq(data.lastUpdatedAt, block.timestamp);
-    //   assertEq(data.periodFinish, block.timestamp);
-    // }
+        // Admin add reward token
+        vm.startPrank(owner);
+        locker.addRewardToken(crv);
+        vm.stopPrank();
 
-    // function testFail_AddRewardAsNonOwner() public {
-    //   locker.addReward(crv, 1 ether);
-    // }
+        uint256 tokenId1 = nft.mint(alice);
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = tokenId1;
 
-    // function testFail_AddRewardWithInvalidAmount() public {
-    //   vm.startPrank(owner);
-    //   locker.addRewardToken(crv);
-    //   locker.addReward(crv, 0 ether);
-    // }
+        // Alice lock NFT
+        vm.warp(blockTimestamp + 100);
+        vm.startPrank(alice);
+        nft.setApprovalForAll(address(locker), true);
+        locker.lock(tokenIds);
+        vm.stopPrank();
 
-    // function testFail_AddRewardWithInvalidToken() public {
-    //   vm.startPrank(owner);
-    //   locker.addReward(crv, 1 ether);
-    // }
+        // Admin distribute 10_000 CRV as reward
+        vm.warp(blockTimestamp + 100 + 500);
+        vm.startPrank(owner);
+        deal(address(crv), owner, 10_000 ether);
+        crv.safeIncreaseAllowance(address(locker), 10_000 ether);
+        locker.distribute(crv, 10_000 ether);
+        vm.stopPrank();
 
-    // function test_AddRewardOncePerEpoch() public {
-    //   vm.startPrank(owner);
-    //   locker.addRewardToken(crv);
-    //   locker.addReward(crv, 1 ether);
+        // Check reward states
+        LlamaLocker.RewardState memory rewardState = locker.getRewardState(crv);
+        assertEq(rewardState.updatedAt, 1702303596);
+        assertEq(rewardState.periodEndAt, 1702908396); // block.timestamp + REWARD_DURATION
+        assertEq(rewardState.rewardPerSecond, 16534391534391534); // 0.016 CRV per second
+        assertEq(rewardState.rewardPerNFTStored, 0);
 
-    //   LlamaLocker.RewardTokenData memory data = locker.getRewardTokenData(crv);
-    //   assertEq(data.periodFinish, block.timestamp + locker.REWARD_DURATION());
-    //   assertEq(data.rewardPerSecond, 1 ether / locker.REWARD_DURATION());
-    //   assertEq(data.lastUpdatedAt, block.timestamp);
-    // }
+        // Admin distribute 20_000 as reward again
+        vm.warp(blockTimestamp + 100 + 500 + 500);
+        vm.startPrank(owner);
+        deal(address(crv), owner, 20_000 ether);
+        crv.safeIncreaseAllowance(address(locker), 20_000 ether);
+        locker.distribute(crv, 20_000 ether);
+        vm.stopPrank();
+
+        // Check reward states
+        rewardState = locker.getRewardState(crv);
+        assertEq(rewardState.updatedAt, 1702304096);
+        assertEq(rewardState.periodEndAt, 1702908896); // block.timestamp + REWARD_DURATION
+        assertEq(rewardState.rewardPerSecond, 49589505298003974); // 0.04 CRV per second
+        assertEq(rewardState.rewardPerNFTStored, 8267195767195767000); // 8.267 CRV per locked NFT
+    }
 
     //************************************************************//
     //                          Lock NFT                          //

@@ -25,10 +25,10 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
 
     // TODO(pyk): explain these fields
     struct RewardState {
-        uint48 endAt;
+        uint48 periodEndAt;
         uint208 rewardPerSecond;
         uint48 updatedAt;
-        uint208 rewardPerTokenStored;
+        uint208 rewardPerNFTStored;
     }
 
     IERC20[] public rewardTokens;
@@ -47,8 +47,8 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
     error UnlockOwnerInvalid();
     error NoLockers();
 
-    event RewardTokenAdded(IERC20 rewardToken);
-    event RewardAdded(IERC20 rewardToken, uint256 rewardAmount);
+    event RewardTokenAdded(IERC20 token);
+    event RewardDistributed(IERC20 token, uint256 amount);
 
     constructor(address owner_, address nft_) Ownable(owner_) {
         nft = IERC721(nft_);
@@ -78,9 +78,28 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
 
         rewardTokens.push(_token);
         rewardStates[_token].updatedAt = block.timestamp.toUint48();
-        rewardStates[_token].endAt = block.timestamp.toUint48();
+        rewardStates[_token].periodEndAt = block.timestamp.toUint48();
 
         emit RewardTokenAdded(_token);
+    }
+
+    /// @dev Calc ulate reward per locked NFT
+    function _rewardPerNFT(IERC20 _token) internal view returns (uint256 amount) {
+        RewardState memory rewardState = rewardStates[_token];
+        uint256 prevRewardPerNFT = uint256(rewardState.rewardPerNFTStored);
+        uint256 periodEndAt = Math.min(uint256(rewardState.periodEndAt), block.timestamp);
+        uint256 timeDelta = periodEndAt - uint256(rewardState.updatedAt);
+        uint256 rewardPerNFT = (timeDelta * rewardState.rewardPerSecond) / totalLockedNFT;
+        return prevRewardPerNFT + rewardPerNFT;
+    }
+
+    /// @dev Update reward states
+    function _updateRewardStates() internal {
+        for (uint256 i = 0; i < rewardTokens.length; i++) {
+            IERC20 token = rewardTokens[i];
+            rewardStates[token].rewardPerNFTStored = _rewardPerNFT(token).toUint208();
+            rewardStates[token].updatedAt = Math.min(rewardStates[token].periodEndAt, block.timestamp).toUint48();
+        }
     }
 
     /// @notice Distribute rewards to lockers
@@ -90,7 +109,23 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
         if (rewardStates[_token].updatedAt == 0) revert RewardTokenNotExists();
         if (_amount == 0) revert RewardAmountInvalid();
         if (totalLockedNFT == 0) revert NoLockers();
-        //
+
+        _updateRewardStates();
+
+        RewardState storage rewardState = rewardStates[_token];
+        if (block.timestamp >= rewardState.periodEndAt) {
+            rewardState.rewardPerSecond = (_amount / REWARD_DURATION).toUint208();
+        } else {
+            uint256 remaining = rewardState.periodEndAt - block.timestamp;
+            uint256 leftover = remaining * rewardState.rewardPerSecond;
+            rewardState.rewardPerSecond = ((_amount + leftover) / REWARD_DURATION).toUint208();
+        }
+
+        rewardState.updatedAt = block.timestamp.toUint48();
+        rewardState.periodEndAt = (block.timestamp + REWARD_DURATION).toUint48();
+
+        _token.safeTransferFrom(msg.sender, address(this), _amount);
+        emit RewardDistributed(_token, _amount);
     }
 
     function lock(uint256[] calldata tokenIds_) external {
