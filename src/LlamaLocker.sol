@@ -37,7 +37,7 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
     IERC721 public nft;
     mapping(uint256 tokenId => address owner) private nftOwners;
     uint256 public constant REWARD_DURATION = 7 days;
-    uint256 public totalLockedNft;
+    uint256 public totalLockedNFT;
 
     error RenounceInvalid();
     error RewardTokenExists();
@@ -89,7 +89,7 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
     function distribute(IERC20 _token, uint256 _amount) external onlyOwner {
         if (rewardStates[_token].updatedAt == 0) revert RewardTokenNotExists();
         if (_amount == 0) revert RewardAmountInvalid();
-        if (totalLockedNft == 0) revert NoLockers();
+        if (totalLockedNFT == 0) revert NoLockers();
         //
     }
 
@@ -100,11 +100,18 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
             nft.safeTransferFrom(msg.sender, address(this), tokenIds_[i]);
             nftOwners[tokenIds_[i]] = msg.sender;
         }
+
+        // Increase total locked NFT
+        totalLockedNFT += tokenCount;
     }
 
     function unlock(uint256[] calldata tokenIds_) external {
         uint256 tokenCount = tokenIds_.length;
         if (tokenCount == 0) revert LockZeroToken();
+
+        // Decrease total locked NFT
+        totalLockedNFT -= tokenCount;
+
         for (uint256 i = 0; i < tokenCount; ++i) {
             if (nftOwners[tokenIds_[i]] != msg.sender) revert UnlockOwnerInvalid();
             nft.safeTransferFrom(address(this), msg.sender, tokenIds_[i]);

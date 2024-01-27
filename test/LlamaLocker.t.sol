@@ -139,6 +139,10 @@ contract LlamaLockerTest is Test {
     //   assertEq(data.lastUpdatedAt, block.timestamp);
     // }
 
+    //************************************************************//
+    //                          Lock NFT                          //
+    //************************************************************//
+
     function testLockNFTZeroToken() public {
         uint256[] memory tokenIds = new uint256[](0);
 
@@ -146,7 +150,7 @@ contract LlamaLockerTest is Test {
         locker.lock(tokenIds);
     }
 
-    function testLockNFTTransferred() public {
+    function testLockNFT() public {
         uint256 tokenId1 = nft.mint(alice);
         uint256 tokenId2 = nft.mint(alice);
         uint256[] memory tokenIds = new uint256[](2);
@@ -158,9 +162,17 @@ contract LlamaLockerTest is Test {
         locker.lock(tokenIds);
         vm.stopPrank();
 
+        // NFT should be transfered to locker
         assertEq(nft.ownerOf(tokenId1), address(locker));
         assertEq(nft.ownerOf(tokenId2), address(locker));
+
+        // total locked NFT should be increased
+        assertEq(locker.totalLockedNFT(), 2);
     }
+
+    //************************************************************//
+    //                         Unlock NFT                         //
+    //************************************************************//
 
     function testUnlockNFTInvalidOwner() public {
         uint256 tokenId1 = nft.mint(alice);
@@ -179,7 +191,7 @@ contract LlamaLockerTest is Test {
         locker.unlock(tokenIds);
     }
 
-    function testUnlockNFTTransfered() public {
+    function testUnlockNFT() public {
         uint256 tokenId1 = nft.mint(alice);
         uint256 tokenId2 = nft.mint(alice);
         uint256[] memory tokenIds = new uint256[](2);
@@ -192,7 +204,11 @@ contract LlamaLockerTest is Test {
         locker.unlock(tokenIds);
         vm.stopPrank();
 
+        // Unlocked NFT should be transferred
         assertEq(nft.ownerOf(tokenId1), alice);
         assertEq(nft.ownerOf(tokenId2), alice);
+
+        // totalLockedNFT should decrease
+        assertEq(locker.totalLockedNFT(), 0);
     }
 }
