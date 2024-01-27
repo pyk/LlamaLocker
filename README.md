@@ -37,5 +37,5 @@ forge install
 Run the tests:
 
 ```shell
-forge test
+forge test --rpc-url https://ethereum.publicnode.com
 ```
