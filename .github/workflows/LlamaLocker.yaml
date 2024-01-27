@@ -20,4 +20,4 @@ jobs:
           version: nightly
       - run: forge --version
       - run: forge build --sizes
-      - run: forge test -vvv
+      - run: forge test -vvv --rpc-url https://ethereum.publicnode.com
