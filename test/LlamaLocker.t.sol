@@ -95,6 +95,14 @@ contract LlamaLockerTest is Test {
         locker.distribute(crv, 0);
     }
 
+    function testDistributeNoLockersRevert() public {
+        vm.startPrank(owner);
+        locker.addRewardToken(crv);
+
+        vm.expectRevert(abi.encodeWithSelector(LlamaLocker.NoLockers.selector));
+        locker.distribute(crv, 1 ether);
+    }
+
     // function test_AddRewardAsOwner() public {
     //   vm.startPrank(owner);
     //   locker.addRewardToken(crv);
