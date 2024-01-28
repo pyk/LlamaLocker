@@ -68,7 +68,7 @@ contract LlamaLockerTest is Test {
 
         LlamaLocker.RewardState memory states = locker.getRewardState(crv);
         assertEq(states.updatedAt, block.timestamp);
-        assertEq(states.periodEndAt, block.timestamp);
+        assertEq(states.epochEndAt, block.timestamp);
         assertEq(states.rewardPerSecond, 0);
         assertEq(states.rewardPerNFTStored, 0);
 
@@ -137,7 +137,7 @@ contract LlamaLockerTest is Test {
         // Check reward states
         LlamaLocker.RewardState memory rewardState = locker.getRewardState(crv);
         assertEq(rewardState.updatedAt, 1702303596);
-        assertEq(rewardState.periodEndAt, 1702908396); // block.timestamp + REWARD_DURATION
+        assertEq(rewardState.epochEndAt, 1702908396); // block.timestamp + REWARD_DURATION
         assertEq(rewardState.rewardPerSecond, 16534391534391534); // 0.016 CRV per second
         assertEq(rewardState.rewardPerNFTStored, 0);
 
@@ -152,7 +152,7 @@ contract LlamaLockerTest is Test {
         // Check reward states
         rewardState = locker.getRewardState(crv);
         assertEq(rewardState.updatedAt, 1702304096);
-        assertEq(rewardState.periodEndAt, 1702908896); // block.timestamp + REWARD_DURATION
+        assertEq(rewardState.epochEndAt, 1702908896); // block.timestamp + REWARD_DURATION
         assertEq(rewardState.rewardPerSecond, 49589505298003974); // 0.04 CRV per second
         assertEq(rewardState.rewardPerNFTStored, 8267195767195767000); // 8.267 CRV per locked NFT
 
