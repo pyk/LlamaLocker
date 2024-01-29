@@ -46,8 +46,6 @@ Example of Lock Mechanism:
 4. If Llama #1 remains unwithdrawn during this window, it will automatically
    re-lock starting March 7, 2024, at 00:00:00 GMT+0000.
 
-Feel free to share more text for improvement or specify particular areas of focus!
-
 ## Getting started
 
 Make sure to use latest version of foundry:
