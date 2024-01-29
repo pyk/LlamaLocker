@@ -6,6 +6,7 @@ import {IERC721, ERC721} from "@openzeppelin/token/ERC721/ERC721.sol";
 import {IERC20} from "@openzeppelin/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/access/Ownable2Step.sol";
+import {SafeCast} from "@openzeppelin/utils/math/SafeCast.sol";
 
 import {LlamaLocker} from "@src/LlamaLocker.sol";
 
@@ -27,6 +28,7 @@ contract NFT is ERC721 {
  */
 contract LlamaLockerTest is Test {
     using SafeERC20 for IERC20;
+    using SafeCast for uint256;
 
     LlamaLocker private locker;
 
@@ -36,6 +38,7 @@ contract LlamaLockerTest is Test {
     IERC20 private crv = IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
 
     function setUp() public {
+        vm.warp(1706482182); // NOTE: Sun Jan 28 2024 22:49:42 GMT+0000
         locker = new LlamaLocker(owner, address(nft));
     }
 
@@ -50,36 +53,66 @@ contract LlamaLockerTest is Test {
     //************************************************************//
 
     function testEpochFirst() public {
-        vm.warp(1706482182);
-        LlamaLocker llamaLocker = new LlamaLocker(owner, address(nft));
-        LlamaLocker.Epoch memory epoch = llamaLocker.getEpoch(0);
+        LlamaLocker.Epoch memory epoch = locker.getEpoch(0);
         assertEq(epoch.startAt, 1706140800);
     }
 
     /// @dev Calling lock() should backfill epochs
     function testEpochBackfillOnLock() public {
-        vm.warp(1706482182);
-        LlamaLocker llamaLocker = new LlamaLocker(owner, address(nft));
-
         uint256 tokenId1 = nft.mint(alice);
         uint256 tokenId2 = nft.mint(alice);
-        uint256[] memory tokenIds = new uint256[](2);
-        tokenIds[0] = tokenId1;
-        tokenIds[1] = tokenId2;
+        LlamaLocker.LockInput[] memory lockInputs = new LlamaLocker.LockInput[](2);
+        lockInputs[0] = LlamaLocker.LockInput({tokenId: tokenId1.toUint8(), recipient: alice});
+        lockInputs[1] = LlamaLocker.LockInput({tokenId: tokenId2.toUint8(), recipient: alice});
 
         vm.startPrank(alice);
-        nft.setApprovalForAll(address(llamaLocker), true);
-        vm.warp(1709769610); // enter epoch 7
-        llamaLocker.lock(tokenIds);
+        nft.setApprovalForAll(address(locker), true);
+        vm.warp(1709769610); // enter epoch index 6
+        locker.lock(lockInputs);
         vm.stopPrank();
 
-        assertEq(llamaLocker.getEpoch(0).startAt, 1706140800);
-        assertEq(llamaLocker.getEpoch(1).startAt, 1706745600);
-        assertEq(llamaLocker.getEpoch(2).startAt, 1707350400);
-        assertEq(llamaLocker.getEpoch(3).startAt, 1707955200);
-        assertEq(llamaLocker.getEpoch(4).startAt, 1708560000);
-        assertEq(llamaLocker.getEpoch(5).startAt, 1709164800);
-        assertEq(llamaLocker.getEpoch(6).startAt, 1709769600);
+        assertEq(locker.getEpoch(0).startAt, 1706140800);
+        assertEq(locker.getEpoch(1).startAt, 1706745600);
+        assertEq(locker.getEpoch(2).startAt, 1707350400);
+        assertEq(locker.getEpoch(3).startAt, 1707955200);
+        assertEq(locker.getEpoch(4).startAt, 1708560000);
+        assertEq(locker.getEpoch(5).startAt, 1709164800);
+        assertEq(locker.getEpoch(6).startAt, 1709769600);
+
+        // panic: array out-of-bounds access
+        vm.expectRevert();
+        locker.getEpoch(7);
+    }
+
+    /// @dev Calling unlock() should backfill epochs
+    function testEpochBackfillOnUnlock() public {
+        uint256 tokenId1 = nft.mint(alice);
+        uint256 tokenId2 = nft.mint(alice);
+        LlamaLocker.LockInput[] memory lockInputs = new LlamaLocker.LockInput[](2);
+        lockInputs[0] = LlamaLocker.LockInput({tokenId: tokenId1.toUint8(), recipient: alice});
+        lockInputs[1] = LlamaLocker.LockInput({tokenId: tokenId2.toUint8(), recipient: alice});
+
+        uint256[] memory unlockInputs = new uint256[](2);
+        unlockInputs[0] = tokenId1;
+        unlockInputs[1] = tokenId2;
+
+        vm.startPrank(alice);
+        nft.setApprovalForAll(address(locker), true);
+        locker.lock(lockInputs);
+        vm.warp(1709164900); // enter epoch index 5
+        locker.unlock(unlockInputs);
+        vm.stopPrank();
+
+        assertEq(locker.getEpoch(0).startAt, 1706140800);
+        assertEq(locker.getEpoch(1).startAt, 1706745600);
+        assertEq(locker.getEpoch(2).startAt, 1707350400);
+        assertEq(locker.getEpoch(3).startAt, 1707955200);
+        assertEq(locker.getEpoch(4).startAt, 1708560000);
+        assertEq(locker.getEpoch(5).startAt, 1709164800);
+
+        // panic: array out-of-bounds access
+        vm.expectRevert();
+        locker.getEpoch(6);
     }
 
     //************************************************************//
@@ -153,14 +186,14 @@ contract LlamaLockerTest is Test {
         vm.stopPrank();
 
         uint256 tokenId1 = nft.mint(alice);
-        uint256[] memory tokenIds = new uint256[](1);
-        tokenIds[0] = tokenId1;
+        LlamaLocker.LockInput[] memory lockInputs = new LlamaLocker.LockInput[](2);
+        lockInputs[0] = LlamaLocker.LockInput({tokenId: tokenId1.toUint8(), recipient: alice});
 
         // Alice lock NFT
         vm.warp(blockTimestamp + 100);
         vm.startPrank(alice);
         nft.setApprovalForAll(address(locker), true);
-        locker.lock(tokenIds);
+        locker.lock(lockInputs);
         vm.stopPrank();
 
         // Admin distribute 10_000 CRV as reward
@@ -201,23 +234,23 @@ contract LlamaLockerTest is Test {
     //                          Lock NFT                          //
     //************************************************************//
 
-    function testLockNFTZeroToken() public {
-        uint256[] memory tokenIds = new uint256[](0);
+    function testLockEmpty() public {
+        LlamaLocker.LockInput[] memory lockInputs = new LlamaLocker.LockInput[](0);
 
-        vm.expectRevert(abi.encodeWithSelector(LlamaLocker.LockZeroToken.selector));
-        locker.lock(tokenIds);
+        vm.expectRevert(abi.encodeWithSelector(LlamaLocker.Empty.selector));
+        locker.lock(lockInputs);
     }
 
     function testLockNFT() public {
         uint256 tokenId1 = nft.mint(alice);
         uint256 tokenId2 = nft.mint(alice);
-        uint256[] memory tokenIds = new uint256[](2);
-        tokenIds[0] = tokenId1;
-        tokenIds[1] = tokenId2;
+        LlamaLocker.LockInput[] memory lockInputs = new LlamaLocker.LockInput[](2);
+        lockInputs[0] = LlamaLocker.LockInput({tokenId: tokenId1.toUint8(), recipient: alice});
+        lockInputs[1] = LlamaLocker.LockInput({tokenId: tokenId2.toUint8(), recipient: alice});
 
         vm.startPrank(alice);
         nft.setApprovalForAll(address(locker), true);
-        locker.lock(tokenIds);
+        locker.lock(lockInputs);
         vm.stopPrank();
 
         // NFT should be transfered to locker
@@ -232,41 +265,57 @@ contract LlamaLockerTest is Test {
     //                         Unlock NFT                         //
     //************************************************************//
 
+    function testUnlockEmpty() public {
+        uint256[] memory inputs = new uint256[](0);
+
+        vm.expectRevert(abi.encodeWithSelector(LlamaLocker.Empty.selector));
+        locker.unlock(inputs);
+    }
+
     function testUnlockNFTInvalidOwner() public {
         uint256 tokenId1 = nft.mint(alice);
         uint256 tokenId2 = nft.mint(alice);
-        uint256[] memory tokenIds = new uint256[](2);
-        tokenIds[0] = tokenId1;
-        tokenIds[1] = tokenId2;
+        LlamaLocker.LockInput[] memory lockInputs = new LlamaLocker.LockInput[](2);
+        lockInputs[0] = LlamaLocker.LockInput({tokenId: tokenId1.toUint8(), recipient: alice});
+        lockInputs[1] = LlamaLocker.LockInput({tokenId: tokenId2.toUint8(), recipient: alice});
 
         vm.startPrank(alice);
         nft.setApprovalForAll(address(locker), true);
-        locker.lock(tokenIds);
+        locker.lock(lockInputs);
         vm.stopPrank();
 
+        // enter epoch index 5; so nft is unlockable
+        vm.warp(1709164900);
+        uint256[] memory unlockInputs = new uint256[](2);
+        unlockInputs[0] = tokenId1;
+        unlockInputs[1] = tokenId2;
+
         vm.startPrank(owner);
-        vm.expectRevert(abi.encodeWithSelector(LlamaLocker.UnlockOwnerInvalid.selector));
-        locker.unlock(tokenIds);
+        vm.expectRevert(abi.encodeWithSelector(LlamaLocker.NotOwner.selector));
+        locker.unlock(unlockInputs);
     }
 
-    function testUnlockNFT() public {
+    function testUnlockNFTValid() public {
         uint256 tokenId1 = nft.mint(alice);
         uint256 tokenId2 = nft.mint(alice);
-        uint256[] memory tokenIds = new uint256[](2);
-        tokenIds[0] = tokenId1;
-        tokenIds[1] = tokenId2;
+        LlamaLocker.LockInput[] memory lockInputs = new LlamaLocker.LockInput[](2);
+        lockInputs[0] = LlamaLocker.LockInput({tokenId: tokenId1.toUint8(), recipient: alice});
+        lockInputs[1] = LlamaLocker.LockInput({tokenId: tokenId2.toUint8(), recipient: alice});
+        uint256[] memory unlockInputs = new uint256[](2);
+        unlockInputs[0] = tokenId1;
+        unlockInputs[1] = tokenId2;
 
         vm.startPrank(alice);
         nft.setApprovalForAll(address(locker), true);
-        locker.lock(tokenIds);
-        locker.unlock(tokenIds);
+        locker.lock(lockInputs);
+        // enter epoch index 5; so nft is unlockable
+        vm.warp(1709164900);
+        locker.unlock(unlockInputs);
         vm.stopPrank();
 
         // Unlocked NFT should be transferred
         assertEq(nft.ownerOf(tokenId1), alice);
         assertEq(nft.ownerOf(tokenId2), alice);
-
-        // totalLockedNFT should decrease
         assertEq(locker.totalLockedNFT(), 0);
     }
 }
