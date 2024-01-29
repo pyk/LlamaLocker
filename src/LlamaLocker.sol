@@ -31,7 +31,6 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
     /// @dev Epoch info
     struct Epoch {
         uint48 startAt;
-        uint8 totalLockedNFT;
     }
 
     /// @dev Per lock info per account
@@ -47,7 +46,7 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
     }
 
     IERC721 public nft;
-    Epoch[] public epochs;
+    Epoch[] private epochs;
     IERC20[] public rewardTokens;
 
     mapping(IERC20 => RewardState) private rewardStates;
@@ -77,12 +76,19 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
         nft = IERC721(nft_);
 
         uint256 currentEpoch = (block.timestamp / EPOCH_DURATION) * EPOCH_DURATION;
-        epochs.push(Epoch({totalLockedNFT: 0, startAt: currentEpoch.toUint48()}));
+        epochs.push(Epoch({startAt: currentEpoch.toUint48()}));
     }
 
     /// @dev This contract ain't gonna work without its owner, ya know?
     function renounceOwnership() public virtual override onlyOwner {
         revert RenounceInvalid();
+    }
+
+    //************************************************************//
+    //                           Epoch                            //
+    //************************************************************//
+    function getEpoch(uint256 _index) external view returns (Epoch memory) {
+        return epochs[_index];
     }
 
     //************************************************************//
@@ -173,29 +179,35 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
         return ((block.timestamp / EPOCH_DURATION) * EPOCH_DURATION) + EPOCH_DURATION;
     }
 
-    function _updateEpochs() internal {
+    /// @dev Backfill epochs
+    function _backfillEpochs() internal {
         uint256 nextEpoch = _nextEpoch();
         uint256 epochindex = epochs.length;
 
         if (epochs[epochindex - 1].startAt < nextEpoch) {
             while (epochs[epochs.length - 1].startAt != nextEpoch) {
                 uint256 nextStartAt = epochs[epochs.length - 1].startAt + EPOCH_DURATION;
-                epochs.push(Epoch({totalLockedNFT: 0, startAt: nextStartAt.toUint48()}));
+                epochs.push(Epoch({startAt: nextStartAt.toUint48()}));
             }
         }
     }
 
+    /// @dev Locked NFT cannot be withdrawn for LOCK_DURATION_IN_EPOCH and are eligible to receive share of yields
     function lock(uint256[] calldata tokenIds_) external {
         uint8 tokenCount = tokenIds_.length.toUint8();
         if (tokenCount == 0) revert LockZeroToken();
+
+        _backfillEpochs();
+
         for (uint8 i = 0; i < tokenCount; ++i) {
             nft.safeTransferFrom(msg.sender, address(this), tokenIds_[i]);
             nftOwners[tokenIds_[i]] = msg.sender;
         }
 
+        // TODO(pyk): check implementation below
+
         _updateRewardStates();
         _updateAccountReward(msg.sender);
-        _updateEpochs();
 
         // Increase total locked NFT
         totalLockedNFT += tokenCount;
@@ -205,10 +217,6 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
         uint256 nextEpoch = _nextEpoch();
         uint256 unlockAt = nextEpoch + LOCK_DURATION;
         acocuntLocks[msg.sender].push(Lock({amount: tokenCount, unlockAt: unlockAt.toUint48()}));
-
-        uint256 epochIndex = epochs.length - 1;
-        Epoch storage e = epochs[epochIndex];
-        e.totalLockedNFT += tokenCount;
 
         emit NFTLocked(msg.sender, tokenCount);
     }

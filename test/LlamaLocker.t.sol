@@ -46,6 +46,43 @@ contract LlamaLockerTest is Test {
     }
 
     //************************************************************//
+    //                           Epoch                            //
+    //************************************************************//
+
+    function testEpochFirst() public {
+        vm.warp(1706482182);
+        LlamaLocker llamaLocker = new LlamaLocker(owner, address(nft));
+        LlamaLocker.Epoch memory epoch = llamaLocker.getEpoch(0);
+        assertEq(epoch.startAt, 1706140800);
+    }
+
+    /// @dev Calling lock() should backfill epochs
+    function testEpochBackfillOnLock() public {
+        vm.warp(1706482182);
+        LlamaLocker llamaLocker = new LlamaLocker(owner, address(nft));
+
+        uint256 tokenId1 = nft.mint(alice);
+        uint256 tokenId2 = nft.mint(alice);
+        uint256[] memory tokenIds = new uint256[](2);
+        tokenIds[0] = tokenId1;
+        tokenIds[1] = tokenId2;
+
+        vm.startPrank(alice);
+        nft.setApprovalForAll(address(llamaLocker), true);
+        vm.warp(1709769610); // enter epoch 7
+        llamaLocker.lock(tokenIds);
+        vm.stopPrank();
+
+        assertEq(llamaLocker.getEpoch(0).startAt, 1706140800);
+        assertEq(llamaLocker.getEpoch(1).startAt, 1706745600);
+        assertEq(llamaLocker.getEpoch(2).startAt, 1707350400);
+        assertEq(llamaLocker.getEpoch(3).startAt, 1707955200);
+        assertEq(llamaLocker.getEpoch(4).startAt, 1708560000);
+        assertEq(llamaLocker.getEpoch(5).startAt, 1709164800);
+        assertEq(llamaLocker.getEpoch(6).startAt, 1709769600);
+    }
+
+    //************************************************************//
     //                      Add Reward Token                      //
     //************************************************************//
 
