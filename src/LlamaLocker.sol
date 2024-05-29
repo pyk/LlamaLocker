@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import {IERC20} from "@openzeppelin/token/ERC20/ERC20.sol";
-import {SafeERC20} from "@openzeppelin/token/ERC20/utils/SafeERC20.sol";
-import {IERC721} from "@openzeppelin/token/ERC721/ERC721.sol";
-import {ERC721Holder} from "@openzeppelin/token/ERC721/utils/ERC721Holder.sol";
-import {Ownable, Ownable2Step} from "@openzeppelin/access/Ownable2Step.sol";
-import {Math} from "@openzeppelin/utils/math/Math.sol";
-import {SafeCast} from "@openzeppelin/utils/math/SafeCast.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {ERC721Holder} from "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
+import {Ownable, Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /**
  * @title Llama Locker
@@ -20,13 +20,19 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
     using SafeCast for uint256;
     using Math for uint256;
 
+    IERC721 public nft;
+    IERC20[] public tokens; // yield token
+    uint256 public constant EPOCH_DURATION = 7 days;
+    uint256 public constant LOCK_DURATION_IN_EPOCH = 4; // 4 epochs
+    uint256 public totalLockedNFT;
+
     struct Epoch {
         uint48 startAt;
     }
 
     struct LockInput {
         address recipient;
-        uint256 tokenId;
+        uint256 nftId;
     }
 
     struct LockInfo {
@@ -35,56 +41,43 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
         address recipient;
     }
 
-    // TODO(pyk): check struct below
+    struct Claimable {
+        IERC20 token;
+        uint256 amount;
+    }
 
-    struct RewardState {
-        uint208 rewardPerSecond;
+    struct YieldInfo {
+        uint208 amountPerSecond;
         uint48 epochEndAt;
-        uint208 rewardPerNFTStored;
+        uint208 amountPerNFTStored;
         uint48 updatedAt;
     }
 
-    struct Lock {
-        uint48 unlockAt;
-        uint8 amount;
+    struct NFTYield {
+        uint256 amount;
+        uint256 paidAmount;
     }
 
-    /// @dev All lock info per account
-    struct LockOverview {
-        uint48 nextUnlockIndex;
-        uint8 lockedAmount;
-    }
-
-    IERC721 public nft;
     Epoch[] private epochs;
-
-    mapping(uint256 tokenId => LockInfo info) private locks;
+    mapping(uint256 nftId => LockInfo info) private locks;
+    mapping(IERC20 token => YieldInfo info) private yields;
+    mapping(uint256 nftId => mapping(IERC20 token => NFTYield)) private nftYields;
 
     // TODO(pyk): check variables below
-    IERC20[] public rewardTokens;
-    mapping(IERC20 => RewardState) private rewardStates;
-    mapping(address => LockOverview) private accountLockOverviews;
-    mapping(address => Lock[]) private acocuntLocks;
-    mapping(address => mapping(IERC20 => uint256)) public rewards;
-    mapping(address => mapping(IERC20 => uint256)) public accountRewardPerNFTPaid;
-
-    uint256 public constant EPOCH_DURATION = 7 days;
-    uint256 public constant LOCK_DURATION_IN_EPOCH = 4; // 4 epochs
-    uint256 public totalLockedNFT;
 
     error RenounceInvalid();
-    error RewardTokenExists();
-    error RewardTokenNotExists();
+    error TokenExists();
+    error TokenNotExists();
     error RewardAmountInvalid();
     error Empty();
     error NotOwner();
     error NotUnlockWindow();
     error NoLockers();
 
-    event RewardTokenAdded(IERC20 token);
+    event TokenAdded(IERC20 token);
     event RewardDistributed(IERC20 token, uint256 amount);
-    event Locked(address owner, uint256 tokenId);
-    event Unlocked(address recipient, uint256 tokenId);
+    event Locked(address owner, uint256 nftId);
+    event Unlocked(address recipient, uint256 nftId);
 
     event DebugCurrentEpochIndex(uint256);
 
@@ -134,88 +127,112 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
     }
 
     //************************************************************//
-    //                    Reward Token Manager                    //
+    //                           Yield                            //
     //************************************************************//
 
-    function getRewardTokenCount() external view returns (uint256 count_) {
-        count_ = rewardTokens.length;
+    function addTokens(IERC20[] memory _tokens) external onlyOwner {
+        uint256 tokenCount = _tokens.length;
+        if (tokenCount == 0) revert Empty();
+
+        for (uint256 i = 0; i < _tokens.length; i++) {
+            IERC20 token = tokens[i];
+
+            if (yields[token].updatedAt > 0) revert TokenExists();
+            tokens.push(token);
+            yields[token].updatedAt = block.timestamp.toUint48();
+            yields[token].epochEndAt = block.timestamp.toUint48();
+
+            emit TokenAdded(token);
+        }
     }
 
-    function getRewardState(IERC20 token_) external view returns (RewardState memory data_) {
-        data_ = rewardStates[token_];
+    function getTokenCount() external view returns (uint256 count) {
+        count = tokens.length;
     }
 
-    /// @notice Add new reward token
-    /// @param _token New reward token address
-    function addRewardToken(IERC20 _token) external onlyOwner {
-        if (rewardStates[_token].updatedAt > 0) revert RewardTokenExists();
-
-        rewardTokens.push(_token);
-        rewardStates[_token].updatedAt = block.timestamp.toUint48();
-        rewardStates[_token].epochEndAt = block.timestamp.toUint48();
-
-        emit RewardTokenAdded(_token);
+    function getYieldInfo(IERC20 _token) external view returns (YieldInfo memory info) {
+        info = yields[_token];
     }
 
-    /// @dev Calc ulate reward per locked NFT
-    function _rewardPerNFT(IERC20 _token) internal view returns (uint256) {
-        RewardState memory rewardState = rewardStates[_token];
-        uint256 prevRewardPerNFT = uint256(rewardState.rewardPerNFTStored);
-        uint256 epochEndAt = Math.min(uint256(rewardState.epochEndAt), block.timestamp);
-        uint256 timeDelta = epochEndAt - uint256(rewardState.updatedAt);
-        uint256 rewardPerNFT = (timeDelta * rewardState.rewardPerSecond) / totalLockedNFT;
-        return prevRewardPerNFT + rewardPerNFT;
+    /// @dev Calculate yield amount per NFT
+    function _yieldAmountPerNFT(IERC20 _token) internal view returns (uint256) {
+        if (totalLockedNFT == 0) return yields[_token].amountPerNFTStored;
+
+        YieldInfo memory yieldInfo = yields[_token];
+        uint256 prevYieldAmountPerNFT = uint256(yieldInfo.amountPerNFTStored);
+        uint256 epochEndAt = Math.min(uint256(yieldInfo.epochEndAt), block.timestamp);
+        uint256 timeDelta = epochEndAt - uint256(yieldInfo.updatedAt);
+        uint256 yieldAmountPerNFT = (timeDelta * yieldInfo.amountPerSecond) / totalLockedNFT;
+        return prevYieldAmountPerNFT + yieldAmountPerNFT;
     }
+
+    function _getClaimableYield(uint256 _nftId, IERC20 _token) internal view returns (uint256) {
+        NFTYield memory nftYield = nftYields[_nftId][_token];
+        uint256 amountPerNFT = _yieldAmountPerNFT(_token);
+        return (amountPerNFT - nftYield.paidAmount) + nftYield.amount;
+    }
+
+    /// @dev Get claimable yield of nftId
+    function getClaimableYield(uint256 _nftId) external view returns (Claimable[] memory claimables) {
+        claimables = new Claimable[](tokens.length);
+        for (uint256 i = 0; i < tokens.length; i++) {
+            IERC20 token = tokens[i];
+            claimables[i].token = token;
+            claimables[i].amount = _getClaimableYield(_nftId, token);
+        }
+    }
+
+    // TODO(pyk): review functions below
 
     /// @dev Update reward states
-    function _updateRewardStates() internal {
-        for (uint256 i = 0; i < rewardTokens.length; i++) {
-            IERC20 token = rewardTokens[i];
-            rewardStates[token].rewardPerNFTStored = _rewardPerNFT(token).toUint208();
-            rewardStates[token].updatedAt = Math.min(rewardStates[token].epochEndAt, block.timestamp).toUint48();
-        }
-    }
+    // function _updateRewardStates() internal {
+    //     for (uint256 i = 0; i < tokens.length; i++) {
+    //         IERC20 token = tokens[i];
+    //         rewardStates[token].rewardPerNFTStored = _rewardPerNFT(token).toUint208();
+    //         rewardStates[token].updatedAt = Math.min(rewardStates[token].epochEndAt, block.timestamp).toUint48();
+    //     }
+    // }
 
-    /// @notice Distribute rewards to lockers
-    /// @param _token The reward token address
-    /// @param _amount The amount of reward token
-    function distribute(IERC20 _token, uint256 _amount) external onlyOwner {
-        if (rewardStates[_token].updatedAt == 0) revert RewardTokenNotExists();
-        if (_amount == 0) revert RewardAmountInvalid();
-        if (totalLockedNFT == 0) revert NoLockers();
+    // / @notice Distribute rewards to lockers
+    // / @param _token The reward token address
+    // / @param _amount The amount of reward token
+    // function distribute(IERC20 _token, uint256 _amount) external onlyOwner {
+    //     if (rewardStates[_token].updatedAt == 0) revert RewardTokenNotExists();
+    //     if (_amount == 0) revert RewardAmountInvalid();
+    //     if (totalLockedNFT == 0) revert NoLockers();
 
-        _updateRewardStates();
+    //     _updateRewardStates();
 
-        RewardState storage rewardState = rewardStates[_token];
-        if (block.timestamp >= rewardState.epochEndAt) {
-            rewardState.rewardPerSecond = (_amount / EPOCH_DURATION).toUint208();
-        } else {
-            uint256 remaining = rewardState.epochEndAt - block.timestamp;
-            uint256 leftover = remaining * rewardState.rewardPerSecond;
-            rewardState.rewardPerSecond = ((_amount + leftover) / EPOCH_DURATION).toUint208();
-        }
+    //     RewardState storage rewardState = rewardStates[_token];
+    //     if (block.timestamp >= rewardState.epochEndAt) {
+    //         rewardState.rewardPerSecond = (_amount / EPOCH_DURATION).toUint208();
+    //     } else {
+    //         uint256 remaining = rewardState.epochEndAt - block.timestamp;
+    //         uint256 leftover = remaining * rewardState.rewardPerSecond;
+    //         rewardState.rewardPerSecond = ((_amount + leftover) / EPOCH_DURATION).toUint208();
+    //     }
 
-        rewardState.updatedAt = block.timestamp.toUint48();
-        rewardState.epochEndAt = (block.timestamp + EPOCH_DURATION).toUint48();
+    //     rewardState.updatedAt = block.timestamp.toUint48();
+    //     rewardState.epochEndAt = (block.timestamp + EPOCH_DURATION).toUint48();
 
-        _token.safeTransferFrom(msg.sender, address(this), _amount);
-        emit RewardDistributed(_token, _amount);
-    }
+    //     _token.safeTransferFrom(msg.sender, address(this), _amount);
+    //     emit RewardDistributed(_token, _amount);
+    // }
 
-    function _earned(address _account, IERC20 _token, uint256 _lockedAmount) internal view returns (uint256) {
-        uint256 rewardPerNFTDiff = _rewardPerNFT(_token) - accountRewardPerNFTPaid[_account][_token];
-        return (_lockedAmount * rewardPerNFTDiff) + rewards[_account][_token];
-    }
+    // function _earned(address _account, IERC20 _token, uint256 _lockedAmount) internal view returns (uint256) {
+    //     uint256 rewardPerNFTDiff = _rewardPerNFT(_token) - accountRewardPerNFTPaid[_account][_token];
+    //     return (_lockedAmount * rewardPerNFTDiff) + rewards[_account][_token];
+    // }
 
-    function _updateAccountReward(address _account) internal {
-        LockOverview memory overview = accountLockOverviews[_account];
-        for (uint256 i = 0; i < rewardTokens.length; i++) {
-            IERC20 token = rewardTokens[i];
-            RewardState memory rewardState = rewardStates[token];
-            rewards[_account][token] = _earned(_account, token, overview.lockedAmount);
-            accountRewardPerNFTPaid[_account][token] = rewardState.rewardPerNFTStored;
-        }
-    }
+    // function _updateAccountReward(address _account) internal {
+    //     LockOverview memory overview = accountLockOverviews[_account];
+    //     for (uint256 i = 0; i < tokens.length; i++) {
+    //         IERC20 token = tokens[i];
+    //         RewardState memory rewardState = rewardStates[token];
+    //         rewards[_account][token] = _earned(_account, token, overview.lockedAmount);
+    //         accountRewardPerNFTPaid[_account][token] = rewardState.rewardPerNFTStored;
+    //     }
+    // }
 
     //************************************************************//
     //                            Lock                            //
@@ -223,16 +240,16 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
 
     function _lock(LockInput memory _input, address _owner, uint256 _currentEpochIndex) internal {
         // Transfer NFT
-        nft.safeTransferFrom(_owner, address(this), _input.tokenId);
+        nft.safeTransferFrom(_owner, address(this), _input.nftId);
 
         // Set lock info
-        locks[_input.tokenId] =
+        locks[_input.nftId] =
             LockInfo({owner: _owner, recipient: _input.recipient, lockedAtEpochIndex: _currentEpochIndex});
 
         // Increase locked NFT
         totalLockedNFT += 1;
 
-        emit Locked(_owner, _input.tokenId);
+        emit Locked(_owner, _input.nftId);
     }
 
     /// @dev Locked NFT cannot be withdrawn for LOCK_DURATION_IN_EPOCH and are eligible to receive share of yields
@@ -253,8 +270,8 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
     //                           Unlock                           //
     //************************************************************//
 
-    function _unlock(address _owner, uint256 _tokenId, uint256 _currentEpochIndex) internal {
-        LockInfo memory lockInfo = locks[_tokenId];
+    function _unlock(address _owner, uint256 _nftId, uint256 _currentEpochIndex) internal {
+        LockInfo memory lockInfo = locks[_nftId];
         if (lockInfo.owner != _owner) revert NotOwner();
 
         uint256 lockedDurationInEpoch = _currentEpochIndex - lockInfo.lockedAtEpochIndex;
@@ -263,14 +280,14 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
         uint256 modulo = lockedDurationInEpoch % (LOCK_DURATION_IN_EPOCH + 1);
         if (modulo != 0) revert NotUnlockWindow();
 
-        nft.safeTransferFrom(address(this), _owner, _tokenId);
+        nft.safeTransferFrom(address(this), _owner, _nftId);
 
-        emit Unlocked(_owner, _tokenId);
+        emit Unlocked(_owner, _nftId);
     }
 
-    /// @dev Unlock NFT; it will revert if tokenId have invalid unlock window
-    function unlock(uint256[] calldata _tokenIds) external {
-        uint256 tokenCount = _tokenIds.length;
+    /// @dev Unlock NFT; it will revert if nftId have invalid unlock window
+    function unlock(uint256[] calldata _nftIds) external {
+        uint256 tokenCount = _nftIds.length;
         if (tokenCount == 0) revert Empty();
 
         // Backfill epochs
@@ -282,7 +299,7 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
         totalLockedNFT -= tokenCount;
 
         for (uint256 i = 0; i < tokenCount; ++i) {
-            _unlock(msg.sender, _tokenIds[i], currentEpochIndex);
+            _unlock(msg.sender, _nftIds[i], currentEpochIndex);
         }
     }
 }
