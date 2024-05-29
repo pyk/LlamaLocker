@@ -1,3 +1,6 @@
 {
-  "recommendations": ["JuanBlanco.solidity", "tintinweb.solidity-metrics"]
+  "recommendations": [
+    "tintinweb.solidity-metrics",
+    "nomicfoundation.hardhat-solidity"
+  ]
 }
