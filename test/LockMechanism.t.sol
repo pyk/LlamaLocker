@@ -29,7 +29,7 @@ contract LockMechanismTest is Test {
         llama.epochs(1);
     }
 
-    function test_lock_ok() public {
+    function test_lock_Valid() public {
         vm.warp(1714608000);
         LlamaLocker llama = new LlamaLocker(admin, address(nft));
 
@@ -77,7 +77,7 @@ contract LockMechanismTest is Test {
         locker.lock(lockInputs);
     }
 
-    function test_unlock_ok() public {
+    function test_unlock_ValidUnlockWindow() public {
         uint256 deployTimestamp = 1714608000;
         uint256 lockTimestamp = 1717026037;
 
