@@ -99,17 +99,21 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
         return start.toUint48();
     }
 
-    function _getNextEpochStart() internal view returns (uint48) {
+    function _getNextEpochStart() private view returns (uint48) {
         return (_getCurrentEpochStart() + EPOCH_DURATION).toUint48();
+    }
+
+    function _getCurrentEpochIndex() private view returns (uint256) {
+        return epochs.length - 1;
     }
 
     /// @dev Backfill epochs up to current epoch
     /// @dev Current epoch index is epochs.length - 1
-    function _backfillEpochs() internal {
+    function _backfillEpochs() private {
         uint48 currentEpochStart = _getCurrentEpochStart();
-        uint256 epochindex = epochs.length;
+        uint256 currentEpochIndex = _getCurrentEpochIndex();
 
-        if (epochs[epochindex - 1].startAt < currentEpochStart) {
+        if (epochs[currentEpochIndex].startAt < currentEpochStart) {
             while (epochs[epochs.length - 1].startAt != currentEpochStart) {
                 uint48 nextStartAt = (epochs[epochs.length - 1].startAt + EPOCH_DURATION).toUint48();
                 epochs.push(Epoch({startAt: nextStartAt}));
@@ -131,7 +135,7 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
         if (lockedCount == 0) revert InvalidLockCount();
 
         _backfillEpochs();
-        uint256 currentEpochIndex = epochs.length - 1;
+        uint256 currentEpochIndex = _getCurrentEpochIndex();
         totalLockedNFT += lockedCount;
 
         for (uint8 i = 0; i < lockedCount; ++i) {
@@ -160,7 +164,7 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
         if (unlockCount == 0) revert InvalidUnlockCount();
 
         _backfillEpochs();
-        uint256 currentEpochIndex = epochs.length - 1;
+        uint256 currentEpochIndex = _getCurrentEpochIndex();
         totalLockedNFT -= unlockCount;
 
         for (uint256 i = 0; i < unlockCount; ++i) {
