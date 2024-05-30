@@ -8,4 +8,4 @@ evm_version = "paris"
 [fmt]
 sort_imports = true
 line_length = 120
-number_underscore = "thousands"
+number_underscore = "preserve"

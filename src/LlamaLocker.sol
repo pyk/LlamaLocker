@@ -58,8 +58,8 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
         uint256 paidAmount;
     }
 
-    Epoch[] private epochs;
-    mapping(uint256 nftId => LockInfo info) private locks;
+    Epoch[] public epochs;
+    mapping(uint256 nftId => LockInfo info) public locks;
     mapping(IERC20 token => YieldInfo info) private yields;
     mapping(uint256 nftId => mapping(IERC20 token => NFTYield)) private nftYields;
 
@@ -70,16 +70,17 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
     error TokenNotExists();
     error RewardAmountInvalid();
     error Empty();
-    error NotOwner();
-    error NotUnlockWindow();
-    error NoLockers();
+
+    error InvalidLockCount();
+    error InvalidUnlockCount();
+    error InvalidYieldRecipient();
+    error InvalidLockOwner();
+    error InvalidUnlockWindow();
 
     event TokenAdded(IERC20 token);
     event RewardDistributed(IERC20 token, uint256 amount);
     event Locked(address owner, uint256 nftId);
     event Unlocked(address recipient, uint256 nftId);
-
-    event DebugCurrentEpochIndex(uint256);
 
     constructor(address owner_, address nft_) Ownable(owner_) {
         nft = IERC721(nft_);
@@ -93,17 +94,7 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
         revert RenounceInvalid();
     }
 
-    //************************************************************//
-    //                           Epoch                            //
-    //************************************************************//
-
-    /// @dev Get epoch by index
-    function getEpoch(uint256 _index) external view returns (Epoch memory) {
-        return epochs[_index];
-    }
-
-    /// @dev Get current epoch start
-    function _getCurrentEpochStart() internal view returns (uint48) {
+    function _getCurrentEpochStart() private view returns (uint48) {
         uint256 start = ((block.timestamp / EPOCH_DURATION) * EPOCH_DURATION);
         return start.toUint48();
     }
@@ -123,6 +114,57 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
                 uint48 nextStartAt = (epochs[epochs.length - 1].startAt + EPOCH_DURATION).toUint48();
                 epochs.push(Epoch({startAt: nextStartAt}));
             }
+        }
+    }
+
+    function _lock(LockInput memory input_, address owner_, uint256 currentEpochIndex_) internal {
+        if (input_.recipient == address(0)) revert InvalidYieldRecipient();
+        nft.safeTransferFrom(owner_, address(this), input_.nftId);
+        locks[input_.nftId] =
+            LockInfo({owner: owner_, recipient: input_.recipient, lockedAtEpochIndex: currentEpochIndex_});
+        emit Locked(owner_, input_.nftId);
+    }
+
+    /// @dev Locked NFT cannot be withdrawn for LOCK_DURATION_IN_EPOCH and are eligible to receive share of yields
+    function lock(LockInput[] calldata _inputs) external {
+        uint256 lockedCount = _inputs.length;
+        if (lockedCount == 0) revert InvalidLockCount();
+
+        _backfillEpochs();
+        uint256 currentEpochIndex = epochs.length - 1;
+        totalLockedNFT += lockedCount;
+
+        for (uint8 i = 0; i < lockedCount; ++i) {
+            _lock(_inputs[i], msg.sender, currentEpochIndex);
+        }
+    }
+
+    function _unlock(address unlocker_, uint256 tokenId_, uint256 currendEpochIndex_) internal {
+        LockInfo memory lockInfo = locks[tokenId_];
+        if (unlocker_ != lockInfo.owner) revert InvalidLockOwner();
+        // TODO(pyk): mark lockInfo as unlocked here
+
+        uint256 lockedDurationInEpoch = currendEpochIndex_ - lockInfo.lockedAtEpochIndex;
+        if (lockedDurationInEpoch == 0) revert InvalidUnlockWindow();
+
+        uint256 modulo = lockedDurationInEpoch % (LOCK_DURATION_IN_EPOCH + 1);
+        if (modulo != 0) revert InvalidUnlockWindow();
+
+        nft.safeTransferFrom(address(this), unlocker_, tokenId_);
+        emit Unlocked(unlocker_, tokenId_);
+    }
+
+    /// @dev Unlock NFT; it will revert if nftId have invalid unlock window
+    function unlock(uint256[] calldata _nftIds) external {
+        uint256 unlockCount = _nftIds.length;
+        if (unlockCount == 0) revert InvalidUnlockCount();
+
+        _backfillEpochs();
+        uint256 currentEpochIndex = epochs.length - 1;
+        totalLockedNFT -= unlockCount;
+
+        for (uint256 i = 0; i < unlockCount; ++i) {
+            _unlock(msg.sender, _nftIds[i], currentEpochIndex);
         }
     }
 
@@ -233,73 +275,4 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
     //         accountRewardPerNFTPaid[_account][token] = rewardState.rewardPerNFTStored;
     //     }
     // }
-
-    //************************************************************//
-    //                            Lock                            //
-    //************************************************************//
-
-    function _lock(LockInput memory _input, address _owner, uint256 _currentEpochIndex) internal {
-        // Transfer NFT
-        nft.safeTransferFrom(_owner, address(this), _input.nftId);
-
-        // Set lock info
-        locks[_input.nftId] =
-            LockInfo({owner: _owner, recipient: _input.recipient, lockedAtEpochIndex: _currentEpochIndex});
-
-        // Increase locked NFT
-        totalLockedNFT += 1;
-
-        emit Locked(_owner, _input.nftId);
-    }
-
-    /// @dev Locked NFT cannot be withdrawn for LOCK_DURATION_IN_EPOCH and are eligible to receive share of yields
-    function lock(LockInput[] calldata _inputs) external {
-        uint256 inputCount = _inputs.length;
-        if (inputCount == 0) revert Empty();
-
-        _backfillEpochs();
-        uint256 currentEpochIndex = epochs.length - 1;
-        emit DebugCurrentEpochIndex(currentEpochIndex);
-
-        for (uint8 i = 0; i < inputCount; ++i) {
-            _lock(_inputs[i], msg.sender, currentEpochIndex);
-        }
-    }
-
-    //************************************************************//
-    //                           Unlock                           //
-    //************************************************************//
-
-    function _unlock(address _owner, uint256 _nftId, uint256 _currentEpochIndex) internal {
-        LockInfo memory lockInfo = locks[_nftId];
-        if (lockInfo.owner != _owner) revert NotOwner();
-
-        uint256 lockedDurationInEpoch = _currentEpochIndex - lockInfo.lockedAtEpochIndex;
-        if (lockedDurationInEpoch == 0) revert NotUnlockWindow();
-
-        uint256 modulo = lockedDurationInEpoch % (LOCK_DURATION_IN_EPOCH + 1);
-        if (modulo != 0) revert NotUnlockWindow();
-
-        nft.safeTransferFrom(address(this), _owner, _nftId);
-
-        emit Unlocked(_owner, _nftId);
-    }
-
-    /// @dev Unlock NFT; it will revert if nftId have invalid unlock window
-    function unlock(uint256[] calldata _nftIds) external {
-        uint256 tokenCount = _nftIds.length;
-        if (tokenCount == 0) revert Empty();
-
-        // Backfill epochs
-        _backfillEpochs();
-        uint256 currentEpochIndex = epochs.length - 1;
-        emit DebugCurrentEpochIndex(currentEpochIndex);
-
-        // Decrease total locked NFT
-        totalLockedNFT -= tokenCount;
-
-        for (uint256 i = 0; i < tokenCount; ++i) {
-            _unlock(msg.sender, _nftIds[i], currentEpochIndex);
-        }
-    }
 }
