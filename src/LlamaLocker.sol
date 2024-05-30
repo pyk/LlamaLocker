@@ -60,7 +60,7 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
 
     Epoch[] public epochs;
     mapping(uint256 nftId => LockInfo info) public locks;
-    mapping(address token => RewardTokenInfo info) public rewards;
+    mapping(address token => RewardTokenInfo info) public rewardTokenInfos;
     mapping(uint256 nftId => mapping(IERC20 token => NFTYield)) private nftYields;
 
     // TODO(pyk): check variables below
@@ -177,10 +177,10 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
 
     function _addRewardToken(address token_) private {
         if (address(token_) == address(0)) revert InvalidRewardToken();
-        if (rewards[token_].updatedAt > 0) revert InvalidRewardToken();
+        if (rewardTokenInfos[token_].updatedAt > 0) revert InvalidRewardToken();
         tokens.push(token_);
-        rewards[token_].updatedAt = block.timestamp.toUint48();
-        rewards[token_].epochEndAt = block.timestamp.toUint48();
+        rewardTokenInfos[token_].updatedAt = block.timestamp.toUint48();
+        rewardTokenInfos[token_].epochEndAt = block.timestamp.toUint48();
         emit NewRewardToken(token_);
     }
 
@@ -195,6 +195,29 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
 
     function getRewardTokenCount() external view returns (uint256 count) {
         count = tokens.length;
+    }
+
+    function distributeRewards(IERC20 _token, uint256 _amount) external onlyOwner {
+        // if (rewardTokenInfos[_token].updatedAt == 0) revert RewardTokenNotExists();
+        // if (_amount == 0) revert RewardAmountInvalid();
+        // if (totalLockedNFT == 0) revert NoLockers();
+
+        // _updateRewardStates();
+
+        // RewardState storage rewardState = rewardStates[_token];
+        // if (block.timestamp >= rewardState.epochEndAt) {
+        //     rewardState.rewardPerSecond = (_amount / EPOCH_DURATION).toUint208();
+        // } else {
+        //     uint256 remaining = rewardState.epochEndAt - block.timestamp;
+        //     uint256 leftover = remaining * rewardState.rewardPerSecond;
+        //     rewardState.rewardPerSecond = ((_amount + leftover) / EPOCH_DURATION).toUint208();
+        // }
+
+        // rewardState.updatedAt = block.timestamp.toUint48();
+        // rewardState.epochEndAt = (block.timestamp + EPOCH_DURATION).toUint48();
+
+        // _token.safeTransferFrom(msg.sender, address(this), _amount);
+        // emit RewardDistributed(_token, _amount);
     }
 
     // function getYieldInfo(IERC20 _token) external view returns (YieldInfo memory info) {
@@ -238,32 +261,6 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
     //         rewardStates[token].rewardPerNFTStored = _rewardPerNFT(token).toUint208();
     //         rewardStates[token].updatedAt = Math.min(rewardStates[token].epochEndAt, block.timestamp).toUint48();
     //     }
-    // }
-
-    // / @notice Distribute rewards to lockers
-    // / @param _token The reward token address
-    // / @param _amount The amount of reward token
-    // function distribute(IERC20 _token, uint256 _amount) external onlyOwner {
-    //     if (rewardStates[_token].updatedAt == 0) revert RewardTokenNotExists();
-    //     if (_amount == 0) revert RewardAmountInvalid();
-    //     if (totalLockedNFT == 0) revert NoLockers();
-
-    //     _updateRewardStates();
-
-    //     RewardState storage rewardState = rewardStates[_token];
-    //     if (block.timestamp >= rewardState.epochEndAt) {
-    //         rewardState.rewardPerSecond = (_amount / EPOCH_DURATION).toUint208();
-    //     } else {
-    //         uint256 remaining = rewardState.epochEndAt - block.timestamp;
-    //         uint256 leftover = remaining * rewardState.rewardPerSecond;
-    //         rewardState.rewardPerSecond = ((_amount + leftover) / EPOCH_DURATION).toUint208();
-    //     }
-
-    //     rewardState.updatedAt = block.timestamp.toUint48();
-    //     rewardState.epochEndAt = (block.timestamp + EPOCH_DURATION).toUint48();
-
-    //     _token.safeTransferFrom(msg.sender, address(this), _amount);
-    //     emit RewardDistributed(_token, _amount);
     // }
 
     // function _earned(address _account, IERC20 _token, uint256 _lockedAmount) internal view returns (uint256) {

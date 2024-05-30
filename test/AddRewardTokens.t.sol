@@ -52,13 +52,13 @@ contract AddRewardTokensTest is Test {
 
         // addRewardTokens() should set initial values
         (uint208 amountPerSecond, uint48 epochEndAt, uint208 amountPerNFTStored, uint48 updatedAt) =
-            llama.rewards(address(token0));
+            llama.rewardTokenInfos(address(token0));
         assertEq(amountPerSecond, 0, "invalid token0 amountPerSecond");
         assertEq(epochEndAt, block.timestamp, "invalid token0 epochEndAt");
         assertEq(amountPerNFTStored, 0, "invalid token0 amountPerNFTStored");
         assertEq(updatedAt, block.timestamp, "invalid token0 updatedAt");
 
-        (amountPerSecond, epochEndAt, amountPerNFTStored, updatedAt) = llama.rewards(address(token1));
+        (amountPerSecond, epochEndAt, amountPerNFTStored, updatedAt) = llama.rewardTokenInfos(address(token1));
         assertEq(amountPerSecond, 0, "invalid token1 amountPerSecond");
         assertEq(epochEndAt, block.timestamp, "invalid token1 epochEndAt");
         assertEq(amountPerNFTStored, 0, "invalid token1 amountPerNFTStored");
