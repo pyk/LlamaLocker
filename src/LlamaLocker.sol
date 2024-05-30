@@ -21,7 +21,7 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
     using Math for uint256;
 
     IERC721 public nft;
-    IERC20[] public tokens; // yield token
+    address[] public tokens; // reward tokens
     uint256 public constant EPOCH_DURATION = 7 days;
     uint256 public constant LOCK_DURATION_IN_EPOCH = 4; // 4 epochs
     uint256 public totalLockedNFT;
@@ -46,7 +46,7 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
         uint256 amount;
     }
 
-    struct YieldInfo {
+    struct RewardTokenInfo {
         uint208 amountPerSecond;
         uint48 epochEndAt;
         uint208 amountPerNFTStored;
@@ -60,7 +60,7 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
 
     Epoch[] public epochs;
     mapping(uint256 nftId => LockInfo info) public locks;
-    mapping(IERC20 token => YieldInfo info) private yields;
+    mapping(address token => RewardTokenInfo info) public rewards;
     mapping(uint256 nftId => mapping(IERC20 token => NFTYield)) private nftYields;
 
     // TODO(pyk): check variables below
@@ -76,8 +76,10 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
     error InvalidYieldRecipient();
     error InvalidLockOwner();
     error InvalidUnlockWindow();
+    error InvalidRewardTokenCount();
+    error InvalidRewardToken();
 
-    event TokenAdded(IERC20 token);
+    event NewRewardToken(address token);
     event RewardDistributed(IERC20 token, uint256 amount);
     event Locked(address owner, uint256 nftId);
     event Unlocked(address recipient, uint256 nftId);
@@ -147,6 +149,7 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
         LockInfo memory lockInfo = locks[tokenId_];
         if (unlocker_ != lockInfo.owner) revert InvalidLockOwner();
         // TODO(pyk): mark lockInfo as unlocked here
+        // TODO(pyk): claim unclaimed rewards here
 
         uint256 lockedDurationInEpoch = currendEpochIndex_ - lockInfo.lockedAtEpochIndex;
         if (lockedDurationInEpoch == 0) revert InvalidUnlockWindow();
@@ -172,61 +175,59 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
         }
     }
 
-    //************************************************************//
-    //                           Yield                            //
-    //************************************************************//
+    function _addRewardToken(address token_) private {
+        if (address(token_) == address(0)) revert InvalidRewardToken();
+        if (rewards[token_].updatedAt > 0) revert InvalidRewardToken();
+        tokens.push(token_);
+        rewards[token_].updatedAt = block.timestamp.toUint48();
+        rewards[token_].epochEndAt = block.timestamp.toUint48();
+        emit NewRewardToken(token_);
+    }
 
-    function addTokens(IERC20[] memory _tokens) external onlyOwner {
-        uint256 tokenCount = _tokens.length;
-        if (tokenCount == 0) revert Empty();
-
-        for (uint256 i = 0; i < _tokens.length; i++) {
-            IERC20 token = tokens[i];
-
-            if (yields[token].updatedAt > 0) revert TokenExists();
-            tokens.push(token);
-            yields[token].updatedAt = block.timestamp.toUint48();
-            yields[token].epochEndAt = block.timestamp.toUint48();
-
-            emit TokenAdded(token);
+    function addRewardTokens(address[] memory tokens_) external onlyOwner {
+        uint256 tokenCount = tokens_.length;
+        if (tokenCount == 0) revert InvalidRewardTokenCount();
+        _backfillEpochs();
+        for (uint256 i = 0; i < tokens_.length; i++) {
+            _addRewardToken(tokens_[i]);
         }
     }
 
-    function getTokenCount() external view returns (uint256 count) {
+    function getRewardTokenCount() external view returns (uint256 count) {
         count = tokens.length;
     }
 
-    function getYieldInfo(IERC20 _token) external view returns (YieldInfo memory info) {
-        info = yields[_token];
-    }
+    // function getYieldInfo(IERC20 _token) external view returns (YieldInfo memory info) {
+    //     info = yields[_token];
+    // }
 
     /// @dev Calculate yield amount per NFT
-    function _yieldAmountPerNFT(IERC20 _token) internal view returns (uint256) {
-        if (totalLockedNFT == 0) return yields[_token].amountPerNFTStored;
+    // function _yieldAmountPerNFT(IERC20 _token) internal view returns (uint256) {
+    //     if (totalLockedNFT == 0) return yields[_token].amountPerNFTStored;
 
-        YieldInfo memory yieldInfo = yields[_token];
-        uint256 prevYieldAmountPerNFT = uint256(yieldInfo.amountPerNFTStored);
-        uint256 epochEndAt = Math.min(uint256(yieldInfo.epochEndAt), block.timestamp);
-        uint256 timeDelta = epochEndAt - uint256(yieldInfo.updatedAt);
-        uint256 yieldAmountPerNFT = (timeDelta * yieldInfo.amountPerSecond) / totalLockedNFT;
-        return prevYieldAmountPerNFT + yieldAmountPerNFT;
-    }
+    //     YieldInfo memory yieldInfo = yields[_token];
+    //     uint256 prevYieldAmountPerNFT = uint256(yieldInfo.amountPerNFTStored);
+    //     uint256 epochEndAt = Math.min(uint256(yieldInfo.epochEndAt), block.timestamp);
+    //     uint256 timeDelta = epochEndAt - uint256(yieldInfo.updatedAt);
+    //     uint256 yieldAmountPerNFT = (timeDelta * yieldInfo.amountPerSecond) / totalLockedNFT;
+    //     return prevYieldAmountPerNFT + yieldAmountPerNFT;
+    // }
 
-    function _getClaimableYield(uint256 _nftId, IERC20 _token) internal view returns (uint256) {
-        NFTYield memory nftYield = nftYields[_nftId][_token];
-        uint256 amountPerNFT = _yieldAmountPerNFT(_token);
-        return (amountPerNFT - nftYield.paidAmount) + nftYield.amount;
-    }
+    // function _getClaimableYield(uint256 _nftId, IERC20 _token) internal view returns (uint256) {
+    //     NFTYield memory nftYield = nftYields[_nftId][_token];
+    //     uint256 amountPerNFT = _yieldAmountPerNFT(_token);
+    //     return (amountPerNFT - nftYield.paidAmount) + nftYield.amount;
+    // }
 
     /// @dev Get claimable yield of nftId
-    function getClaimableYield(uint256 _nftId) external view returns (Claimable[] memory claimables) {
-        claimables = new Claimable[](tokens.length);
-        for (uint256 i = 0; i < tokens.length; i++) {
-            IERC20 token = tokens[i];
-            claimables[i].token = token;
-            claimables[i].amount = _getClaimableYield(_nftId, token);
-        }
-    }
+    // function getClaimableYield(uint256 _nftId) external view returns (Claimable[] memory claimables) {
+    //     claimables = new Claimable[](tokens.length);
+    //     for (uint256 i = 0; i < tokens.length; i++) {
+    //         IERC20 token = tokens[i];
+    //         claimables[i].token = token;
+    //         claimables[i].amount = _getClaimableYield(_nftId, token);
+    //     }
+    // }
 
     // TODO(pyk): review functions below
 
