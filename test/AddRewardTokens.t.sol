@@ -26,43 +26,15 @@ contract AddRewardTokensTest is Test {
     }
 
     function test_addRewardTokens_Valid() public {
-        vm.warp(1714608000);
-        LlamaLocker llama = new LlamaLocker(admin, makeAddr("nft"));
-
         vm.startPrank(admin);
 
         address[] memory rewardTokens = new address[](2);
         rewardTokens[0] = address(token0);
         rewardTokens[1] = address(token1);
 
-        vm.warp(1717026037);
-        llama.addRewardTokens(rewardTokens);
+        locker.addRewardTokens(rewardTokens);
 
-        // addRewardTokens() should backfill epochs
-        assertEq(llama.epochs(0), 1714608000, "invalid epoch 0");
-        assertEq(llama.epochs(1), 1715212800, "invalid epoch 1");
-        assertEq(llama.epochs(2), 1715817600, "invalid epoch 2");
-        assertEq(llama.epochs(3), 1716422400, "invalid epoch 3");
-
-        vm.expectRevert();
-        llama.epochs(4);
-
-        // addRewardTokens() should increase token count
-        assertEq(llama.getRewardTokenCount(), 2, "invalid reward token count");
-
-        // addRewardTokens() should set initial values
-        (uint208 amountPerSecond, uint48 epochEndAt, uint208 amountPerNFTStored, uint48 updatedAt) =
-            llama.rewardTokenInfos(address(token0));
-        assertEq(amountPerSecond, 0, "invalid token0 amountPerSecond");
-        assertEq(epochEndAt, block.timestamp, "invalid token0 epochEndAt");
-        assertEq(amountPerNFTStored, 0, "invalid token0 amountPerNFTStored");
-        assertEq(updatedAt, block.timestamp, "invalid token0 updatedAt");
-
-        (amountPerSecond, epochEndAt, amountPerNFTStored, updatedAt) = llama.rewardTokenInfos(address(token1));
-        assertEq(amountPerSecond, 0, "invalid token1 amountPerSecond");
-        assertEq(epochEndAt, block.timestamp, "invalid token1 epochEndAt");
-        assertEq(amountPerNFTStored, 0, "invalid token1 amountPerNFTStored");
-        assertEq(updatedAt, block.timestamp, "invalid token1 updatedAt");
+        assertEq(locker.getRewardTokenCount(), 2, "invalid reward token count");
     }
 
     function test_addRewardTokens_Unauthorized() public {
@@ -75,7 +47,7 @@ contract AddRewardTokensTest is Test {
     function test_addRewardTokens_InvalidRewardTokenCount() public {
         address[] memory rewardTokens = new address[](0);
         vm.startPrank(admin);
-        vm.expectRevert(abi.encodeWithSelector(LlamaLocker.InvalidRewardTokenCount.selector));
+        vm.expectRevert(abi.encodeWithSelector(LlamaLocker.InvalidTokenCount.selector));
         locker.addRewardTokens(rewardTokens);
     }
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
+import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {LlamaLocker} from "../src/LlamaLocker.sol";
@@ -19,186 +20,176 @@ contract LockMechanismTest is Test {
         locker = new LlamaLocker(admin, address(nft));
     }
 
-    function test_epochs_InitialEpoch() public {
-        vm.warp(1717026037);
-        LlamaLocker llama = new LlamaLocker(admin, address(nft));
-        uint48 start = llama.epochs(0);
-        assertEq(start, 1716422400, "invalid epoch start");
-
-        vm.expectRevert();
-        llama.epochs(1);
-    }
-
     function test_lock_Valid() public {
-        vm.warp(1714608000);
-        LlamaLocker llama = new LlamaLocker(admin, address(nft));
-
         uint256 tokenId = nft.mint(alice);
-        LlamaLocker.LockInput[] memory lockInputs = new LlamaLocker.LockInput[](1);
-        lockInputs[0] = LlamaLocker.LockInput({nftId: tokenId, recipient: alice});
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = tokenId;
 
-        // lock() should backfill epochs
-        vm.warp(1717026037);
         vm.startPrank(alice);
-        nft.setApprovalForAll(address(llama), true);
-        llama.lock(lockInputs);
+        nft.setApprovalForAll(address(locker), true);
         vm.stopPrank();
 
-        assertEq(llama.epochs(0), 1714608000, "invalid epoch 0");
-        assertEq(llama.epochs(1), 1715212800, "invalid epoch 1");
-        assertEq(llama.epochs(2), 1715817600, "invalid epoch 2");
-        assertEq(llama.epochs(3), 1716422400, "invalid epoch 3");
+        vm.startPrank(bob);
+        nft.setApprovalForAll(address(locker), true);
+        vm.stopPrank();
 
-        vm.expectRevert();
-        llama.epochs(4);
+        // epoch 0
+        vm.warp(1714608000);
 
-        // lock() should increase totalLockedNFT
-        assertEq(llama.totalLockedNFT(), 1, "invalid total locked NFT");
+        vm.startPrank(alice);
+        locker.lock(tokenIds);
+        vm.stopPrank();
 
-        // lock() should valid
-        (address owner, uint256 lockedAtEpochIndex, address recipient) = llama.locks(tokenId);
-        assertEq(owner, alice, "invalid lock owner");
-        assertEq(lockedAtEpochIndex, 3, "invalid lock epoch index");
-        assertEq(recipient, alice, "invalid yield recipient");
+        assertEq(locker.getShares(alice), 0, "alice shares invalid epoch 0");
+        assertEq(locker.getTotalShares(), 0, "total shares invalid epoch 0");
+        assertEq(nft.ownerOf(tokenId), address(locker));
+
+        // epoch 1
+        vm.warp(1715212800);
+        tokenId = nft.mint(bob);
+        tokenIds = new uint256[](1);
+        tokenIds[0] = tokenId;
+
+        vm.startPrank(bob);
+        locker.lock(tokenIds);
+        vm.stopPrank();
+
+        assertEq(locker.getShares(alice), 1 ether, "alice shares epoch 1");
+        assertEq(locker.getShares(bob), 0, "bob shares invalid epoch 1");
+        assertEq(locker.getTotalShares(), 1 ether, "total shares invalid epoch 1");
+        assertEq(nft.ownerOf(tokenId), address(locker));
+
+        // epoch 2
+        vm.warp(1715817600);
+        tokenId = nft.mint(alice);
+        tokenIds = new uint256[](1);
+        tokenIds[0] = tokenId;
+
+        vm.startPrank(alice);
+        locker.lock(tokenIds);
+        vm.stopPrank();
+
+        assertEq(locker.getShares(alice), 1 ether, "alice shares epoch 2");
+        assertEq(locker.getShares(bob), 1 ether, "bob shares invalid epoch 2");
+        assertEq(locker.getTotalShares(), 2 ether, "total shares invalid epoch 2");
+        assertEq(nft.ownerOf(tokenId), address(locker));
+
+        // epoch 3
+        vm.warp(1716422400);
+
+        assertEq(locker.getShares(alice), 2 ether, "alice shares epoch 3");
+        assertEq(locker.getShares(bob), 1 ether, "bob shares invalid epoch 3");
+        assertEq(locker.getTotalShares(), 3 ether, "total shares invalid epoch 3");
+        assertEq(nft.ownerOf(tokenId), address(locker));
     }
 
-    function test_lock_InvalidLockCount() public {
-        LlamaLocker.LockInput[] memory lockInputs = new LlamaLocker.LockInput[](0);
-        vm.expectRevert(abi.encodeWithSelector(LlamaLocker.InvalidLockCount.selector));
-        locker.lock(lockInputs);
-    }
-
-    function test_lock_InvalidYieldRecipient() public {
-        uint256 tokenId = nft.mint(alice);
-        LlamaLocker.LockInput[] memory lockInputs = new LlamaLocker.LockInput[](1);
-        lockInputs[0] = LlamaLocker.LockInput({nftId: tokenId, recipient: address(0)});
-
-        vm.expectRevert(abi.encodeWithSelector(LlamaLocker.InvalidYieldRecipient.selector));
-        locker.lock(lockInputs);
+    function test_lock_InvalidTokenCount() public {
+        uint256[] memory tokenIds = new uint256[](0);
+        vm.expectRevert(abi.encodeWithSelector(LlamaLocker.InvalidTokenCount.selector));
+        locker.lock(tokenIds);
     }
 
     function test_unlock_ValidUnlockWindow() public {
-        uint256 deployTimestamp = 1714608000;
         uint256 lockTimestamp = 1717026037;
 
-        vm.warp(deployTimestamp);
-        LlamaLocker llama = new LlamaLocker(admin, address(nft));
-
         uint256 tokenId = nft.mint(alice);
-        LlamaLocker.LockInput[] memory lockInputs = new LlamaLocker.LockInput[](1);
-        lockInputs[0] = LlamaLocker.LockInput({nftId: tokenId, recipient: alice});
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = tokenId;
+
+        vm.startPrank(alice);
+        nft.setApprovalForAll(address(locker), true);
+        vm.stopPrank();
 
         vm.warp(lockTimestamp);
         vm.startPrank(alice);
-        nft.setApprovalForAll(address(llama), true);
-        llama.lock(lockInputs);
+        locker.lock(tokenIds);
         vm.stopPrank();
 
-        uint256[] memory unlockInputs = new uint256[](1);
-        unlockInputs[0] = tokenId;
-
-        // Unlock window at week 5
+        // Unlock window is available at week 5
         vm.warp(lockTimestamp + 30 days);
+
+        assertEq(locker.getShares(alice), 1 ether, "alice shares invalid epoch 4");
+        assertEq(locker.getTotalShares(), 1 ether, "total shares invalid epoch 4");
+
         vm.startPrank(alice);
-        llama.unlock(unlockInputs);
+        locker.unlock(tokenIds);
         vm.stopPrank();
 
-        // Should decrease total locked nft
-        assertEq(llama.totalLockedNFT(), 0, "invalid total locked nft");
-
-        // Should backfill the epochs
-        assertEq(llama.epochs(0), 1714608000, "invalid epoch 0");
-        assertEq(llama.epochs(1), 1715212800, "invalid epoch 1");
-        assertEq(llama.epochs(2), 1715817600, "invalid epoch 2");
-        assertEq(llama.epochs(3), 1716422400, "invalid epoch 3");
-        assertEq(llama.epochs(4), 1717027200, "invalid epoch 4");
-        assertEq(llama.epochs(5), 1717632000, "invalid epoch 5");
-        assertEq(llama.epochs(6), 1718236800, "invalid epoch 6");
-        assertEq(llama.epochs(7), 1718841600, "invalid epoch 7");
-        assertEq(llama.epochs(8), 1719446400, "invalid epoch 8");
-
-        vm.expectRevert();
-        llama.epochs(9);
-
-        // NFT should be transfered
-        assertEq(nft.ownerOf(tokenId), alice, "invalid nft owner");
+        assertEq(locker.getShares(alice), 0 ether, "alice shares invalid epoch 4");
+        assertEq(locker.getTotalShares(), 0 ether, "total shares invalid epoch 4");
+        assertEq(nft.ownerOf(tokenId), alice, "nft owner invalid");
     }
 
-    function test_unlock_InvalidUnlockCount() public {
-        uint256[] memory unlockInputs = new uint256[](0);
-        vm.expectRevert(abi.encodeWithSelector(LlamaLocker.InvalidUnlockCount.selector));
-        locker.unlock(unlockInputs);
+    function test_unlock_InvalidTokenCount() public {
+        uint256[] memory tokenIds = new uint256[](0);
+        vm.expectRevert(abi.encodeWithSelector(LlamaLocker.InvalidTokenCount.selector));
+        locker.unlock(tokenIds);
     }
 
     function test_unlock_InvalidLockOwner() public {
         uint256 tokenId = nft.mint(alice);
-        LlamaLocker.LockInput[] memory lockInputs = new LlamaLocker.LockInput[](1);
-        lockInputs[0] = LlamaLocker.LockInput({nftId: tokenId, recipient: alice});
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = tokenId;
 
         vm.startPrank(alice);
         nft.setApprovalForAll(address(locker), true);
-        locker.lock(lockInputs);
+        locker.lock(tokenIds);
         vm.stopPrank();
-
-        uint256[] memory unlockInputs = new uint256[](1);
-        unlockInputs[0] = tokenId;
 
         vm.startPrank(bob);
         vm.expectRevert(abi.encodeWithSelector(LlamaLocker.InvalidLockOwner.selector));
-        locker.unlock(unlockInputs);
+        locker.unlock(tokenIds);
         vm.stopPrank();
     }
 
     function test_unlock_InvalidUnlockWindow() public {
-        vm.warp(1714608000);
-        LlamaLocker llama = new LlamaLocker(admin, address(nft));
-
         uint256 tokenId = nft.mint(alice);
-        LlamaLocker.LockInput[] memory lockInputs = new LlamaLocker.LockInput[](1);
-        lockInputs[0] = LlamaLocker.LockInput({nftId: tokenId, recipient: alice});
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = tokenId;
 
-        uint256 lockTimestamp = 1717026037;
-        vm.warp(lockTimestamp);
         vm.startPrank(alice);
-        nft.setApprovalForAll(address(llama), true);
-        llama.lock(lockInputs);
+        nft.setApprovalForAll(address(locker), true);
         vm.stopPrank();
 
-        uint256[] memory unlockInputs = new uint256[](1);
-        unlockInputs[0] = tokenId;
+        uint256 lockTimestamp = 1714608000;
+
+        vm.warp(lockTimestamp);
+        vm.startPrank(alice);
+        locker.lock(tokenIds);
+        vm.stopPrank();
 
         // Before unlock window
         vm.startPrank(alice);
         vm.expectRevert(abi.encodeWithSelector(LlamaLocker.InvalidUnlockWindow.selector));
-        llama.unlock(unlockInputs);
+        locker.unlock(tokenIds);
         vm.stopPrank();
 
         // Before unlock window week 1
         vm.warp(lockTimestamp + 6 days);
         vm.startPrank(alice);
         vm.expectRevert(abi.encodeWithSelector(LlamaLocker.InvalidUnlockWindow.selector));
-        llama.unlock(unlockInputs);
+        locker.unlock(tokenIds);
         vm.stopPrank();
 
         // Before unlock window week 2
         vm.warp(lockTimestamp + 12 days);
         vm.startPrank(alice);
         vm.expectRevert(abi.encodeWithSelector(LlamaLocker.InvalidUnlockWindow.selector));
-        llama.unlock(unlockInputs);
+        locker.unlock(tokenIds);
         vm.stopPrank();
 
         // Before unlock window week 3
         vm.warp(lockTimestamp + 18 days);
         vm.startPrank(alice);
         vm.expectRevert(abi.encodeWithSelector(LlamaLocker.InvalidUnlockWindow.selector));
-        llama.unlock(unlockInputs);
+        locker.unlock(tokenIds);
         vm.stopPrank();
 
         // Before unlock window week 4
         vm.warp(lockTimestamp + 24 days);
         vm.startPrank(alice);
         vm.expectRevert(abi.encodeWithSelector(LlamaLocker.InvalidUnlockWindow.selector));
-        llama.unlock(unlockInputs);
+        locker.unlock(tokenIds);
         vm.stopPrank();
 
         // week 5 can be unlocked (~30 days)
@@ -207,7 +198,7 @@ contract LockMechanismTest is Test {
         vm.warp(lockTimestamp + 36 days);
         vm.startPrank(alice);
         vm.expectRevert(abi.encodeWithSelector(LlamaLocker.InvalidUnlockWindow.selector));
-        llama.unlock(unlockInputs);
+        locker.unlock(tokenIds);
         vm.stopPrank();
     }
 }
