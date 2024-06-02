@@ -39,7 +39,45 @@ forge install
 Run the tests:
 
 ```shell
-forge test --rpc-url https://ethereum.publicnode.com
+forge test
+```
+
+Example output:
+
+```
+$ forge test
+[⠊] Compiling...
+No files changed, compilation skipped
+
+Ran 1 test for test/LlamaLocker.t.sol:LlamaLockerTest
+[PASS] test_renounceOwnership_InvalidAction() (gas: 13344)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.21ms (61.08µs CPU time)
+
+Ran 4 tests for test/AddRewardTokens.t.sol:AddRewardTokensTest
+[PASS] test_addRewardTokens_InvalidRewardToken() (gas: 92123)
+[PASS] test_addRewardTokens_InvalidRewardTokenCount() (gas: 13930)
+[PASS] test_addRewardTokens_Unauthorized() (gas: 14167)
+[PASS] test_addRewardTokens_Valid() (gas: 133253)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 1.37ms (325.04µs CPU time)
+
+Ran 6 tests for test/LockMechanism.t.sol:LockMechanismTest
+[PASS] test_lock_InvalidTokenCount() (gas: 9181)
+[PASS] test_lock_Valid() (gas: 448617)
+[PASS] test_unlock_InvalidLockOwner() (gas: 223227)
+[PASS] test_unlock_InvalidTokenCount() (gas: 9181)
+[PASS] test_unlock_InvalidUnlockWindow() (gas: 243021)
+[PASS] test_unlock_ValidUnlockWindow() (gas: 215742)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 1.56ms (1.02ms CPU time)
+
+Ran 5 tests for test/RewardDistribution.t.sol:RewardDistributionTest
+[PASS] test_distributeRewardToken_Claimables() (gas: 968837)
+[PASS] test_distributeRewardToken_InvalidRewardAmount() (gas: 134450)
+[PASS] test_distributeRewardToken_InvalidRewardToken() (gas: 17532)
+[PASS] test_distributeRewardToken_InvalidTotalShares() (gas: 136540)
+[PASS] test_distributeRewardToken_Unauthorized() (gas: 13833)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 1.76ms (1.22ms CPU time)
+
+Ran 4 test suites in 513.25ms (5.90ms CPU time): 16 tests passed, 0 failed, 0 skipped (16 total tests)
 ```
 
 ## Front End Integration
