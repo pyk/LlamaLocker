@@ -46,12 +46,16 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
         int256 nextIndex;
     }
 
+    struct RewardPerShare {
+        uint256 value;
+        uint256 updatedAt;
+    }
+
     mapping(uint256 tokenId => NFTLock lock) public locks;
     mapping(address account => Shares shares) private accountShares;
     mapping(address account => mapping(address token => RewardIndex index)) private rewardIndices;
-    mapping(address token => uint256 rps) private rewardPerShares;
+    mapping(address token => RewardPerShare rps) private rewardPerShares;
     mapping(address account => mapping(address token => uint256 amount)) private claimedRewards;
-    mapping(address token => uint256 epoch) private rewardTokenEpochs;
 
     Shares private totalShares;
 
@@ -108,10 +112,22 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
     }
 
     function _getRewardIndex(address account_, address token_) private view returns (int256 index) {
-        if (block.timestamp < rewardIndices[account_][token_].epoch) {
-            index = rewardIndices[account_][token_].prevIndex;
+        RewardIndex memory rewardIndex = rewardIndices[account_][token_];
+        Shares memory accountShare = accountShares[account_];
+        RewardPerShare memory rps = rewardPerShares[token_];
+
+        // If the user have pending shares when admin distribute the reward token
+        // then it's mean that the user lock the NFT before rewardPerShare is updated;
+        // hence we need to calculate the reward index manually to adjust claimable amount
+        // of the user
+        if (accountShare.epoch > rps.updatedAt) {
+            index = -rps.value.mulDiv(accountShare.nextShares, 1 ether, Math.Rounding.Floor).toInt256();
         } else {
-            index = rewardIndices[account_][token_].nextIndex;
+            if (block.timestamp < rewardIndex.epoch) {
+                index = rewardIndex.prevIndex;
+            } else {
+                index = rewardIndex.nextIndex;
+            }
         }
     }
 
@@ -137,7 +153,7 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
         uint256 rewardTokenCount = rewardTokens.length;
         for (uint256 i = 0; i < rewardTokenCount; ++i) {
             address rewardToken = rewardTokens[i];
-            uint256 rewardPerShare = rewardPerShares[rewardToken];
+            uint256 rewardPerShare = rewardPerShares[rewardToken].value;
             RewardIndex storage index = rewardIndices[account_][rewardToken];
 
             if (index.epoch <= currentEpochStart) {
@@ -220,10 +236,13 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
 
     function _addRewardToken(address token_) private {
         if (address(token_) == address(0)) revert InvalidRewardToken();
-        if (rewardTokenEpochs[token_] > 0) revert InvalidRewardToken();
+        if (rewardPerShares[token_].updatedAt > 0) revert InvalidRewardToken();
 
         rewardTokens.push(token_);
-        rewardTokenEpochs[token_] = block.timestamp;
+
+        RewardPerShare storage rps = rewardPerShares[token_];
+        rps.value = 0;
+        rps.updatedAt = block.timestamp;
     }
 
     function addRewardTokens(address[] memory tokens_) external onlyOwner {
@@ -241,24 +260,26 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
     }
 
     function distributeRewardToken(address token_, uint256 amount_) external onlyOwner {
-        if (rewardTokenEpochs[token_] == 0) revert InvalidRewardToken();
+        if (rewardPerShares[token_].updatedAt == 0) revert InvalidRewardToken();
         if (amount_ == 0) revert InvalidRewardAmount();
 
         uint256 totalSharesAtCurrentEpoch = getTotalShares();
         if (totalSharesAtCurrentEpoch == 0) revert InvalidTotalShares();
 
-        rewardPerShares[token_] += amount_.mulDiv(1 ether, totalSharesAtCurrentEpoch, Math.Rounding.Floor);
+        RewardPerShare storage rps = rewardPerShares[token_];
+        rps.value += amount_.mulDiv(1 ether, totalSharesAtCurrentEpoch, Math.Rounding.Floor);
+        rps.updatedAt = block.timestamp;
     }
 
     function claimable(address account_, address token_) public view returns (uint256 amount) {
-        if (rewardTokenEpochs[token_] == 0) revert InvalidRewardToken();
+        if (rewardPerShares[token_].updatedAt == 0) revert InvalidRewardToken();
 
         uint256 shares = getShares(account_);
         if (shares == 0) return 0;
 
         int256 rewardIndex = _getRewardIndex(account_, token_);
         uint256 claimedAmount = claimedRewards[account_][token_];
-        uint256 rewardPerShare = rewardPerShares[token_];
+        uint256 rewardPerShare = rewardPerShares[token_].value;
         int256 totalRewardAmount = rewardPerShare.mulDiv(shares, 1 ether, Math.Rounding.Floor).toInt256() + rewardIndex;
         amount = uint256(totalRewardAmount) - claimedAmount;
     }
