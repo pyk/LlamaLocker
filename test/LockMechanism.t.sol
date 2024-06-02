@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {LlamaLocker} from "../src/LlamaLocker.sol";
@@ -40,8 +39,6 @@ contract LockMechanismTest is Test {
         locker.lock(tokenIds);
         vm.stopPrank();
 
-        assertEq(locker.getShares(alice), 0, "alice shares invalid epoch 0");
-        assertEq(locker.getTotalShares(), 0, "total shares invalid epoch 0");
         assertEq(nft.ownerOf(tokenId), address(locker));
 
         // epoch 1
@@ -54,9 +51,6 @@ contract LockMechanismTest is Test {
         locker.lock(tokenIds);
         vm.stopPrank();
 
-        assertEq(locker.getShares(alice), 1 ether, "alice shares epoch 1");
-        assertEq(locker.getShares(bob), 0, "bob shares invalid epoch 1");
-        assertEq(locker.getTotalShares(), 1 ether, "total shares invalid epoch 1");
         assertEq(nft.ownerOf(tokenId), address(locker));
 
         // epoch 2
@@ -69,17 +63,10 @@ contract LockMechanismTest is Test {
         locker.lock(tokenIds);
         vm.stopPrank();
 
-        assertEq(locker.getShares(alice), 1 ether, "alice shares epoch 2");
-        assertEq(locker.getShares(bob), 1 ether, "bob shares invalid epoch 2");
-        assertEq(locker.getTotalShares(), 2 ether, "total shares invalid epoch 2");
         assertEq(nft.ownerOf(tokenId), address(locker));
 
         // epoch 3
         vm.warp(1716422400);
-
-        assertEq(locker.getShares(alice), 2 ether, "alice shares epoch 3");
-        assertEq(locker.getShares(bob), 1 ether, "bob shares invalid epoch 3");
-        assertEq(locker.getTotalShares(), 3 ether, "total shares invalid epoch 3");
         assertEq(nft.ownerOf(tokenId), address(locker));
     }
 
@@ -108,15 +95,10 @@ contract LockMechanismTest is Test {
         // Unlock window is available at week 5
         vm.warp(lockTimestamp + 30 days);
 
-        assertEq(locker.getShares(alice), 1 ether, "alice shares invalid epoch 4");
-        assertEq(locker.getTotalShares(), 1 ether, "total shares invalid epoch 4");
-
         vm.startPrank(alice);
         locker.unlock(tokenIds);
         vm.stopPrank();
 
-        assertEq(locker.getShares(alice), 0 ether, "alice shares invalid epoch 4");
-        assertEq(locker.getTotalShares(), 0 ether, "total shares invalid epoch 4");
         assertEq(nft.ownerOf(tokenId), alice, "nft owner invalid");
     }
 

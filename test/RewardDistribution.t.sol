@@ -26,69 +26,73 @@ contract RewardDistributionTest is Test {
         locker = new LlamaLocker(admin, address(nft));
     }
 
-    function test_distributeRewardToken_Valid() public {
-        uint256 tokenId = nft.mint(alice);
+    function _lockNFTAs(address account_) private {
+        uint256 tokenId = nft.mint(account_);
         uint256[] memory tokenIds = new uint256[](1);
         tokenIds[0] = tokenId;
 
-        vm.startPrank(alice);
+        vm.startPrank(account_);
         nft.setApprovalForAll(address(locker), true);
-        vm.stopPrank();
-
-        vm.startPrank(bob);
-        nft.setApprovalForAll(address(locker), true);
-        vm.stopPrank();
-
-        vm.startPrank(charlie);
-        nft.setApprovalForAll(address(locker), true);
-        vm.stopPrank();
-
-        // epoch 0
-        vm.warp(1714608000);
-
-        vm.startPrank(alice);
         locker.lock(tokenIds);
         vm.stopPrank();
+    }
 
+    function _addRewardToken(address token_) private {
         vm.startPrank(admin);
         address[] memory rewardTokens = new address[](1);
-        rewardTokens[0] = address(token0);
+        rewardTokens[0] = token_;
         locker.addRewardTokens(rewardTokens);
-        vm.stopPrank();
+    }
 
-        assertEq(locker.claimable(alice, address(token0)), 0, "alice claimable invalid epoch 0");
-        assertEq(locker.claimable(bob, address(token0)), 0, "bob claimable invalid epoch 0");
-        assertEq(locker.claimable(charlie, address(token0)), 0, "charlie claimable invalid epoch 0");
-
-        // epoch 1
-        vm.warp(1715212800);
-
-        tokenId = nft.mint(bob);
-        tokenIds = new uint256[](1);
-        tokenIds[0] = tokenId;
-
-        vm.startPrank(bob);
-        locker.lock(tokenIds);
-        vm.stopPrank();
-
-        uint256 rewardAmount = 10 ether;
-        token0.mint(admin, rewardAmount);
-
+    function _distributeRewardToken(MockToken token_, uint256 amount_) private {
+        token_.mint(admin, amount_);
         vm.startPrank(admin);
-        token0.approve(address(locker), rewardAmount);
-        locker.distributeRewardToken(address(token0), rewardAmount);
+        token_.approve(address(locker), amount_);
+        locker.distributeRewardToken(address(token_), amount_);
         vm.stopPrank();
+    }
 
-        assertEq(locker.claimable(alice, address(token0)), 10 ether, "alice claimable invalid epoch 1");
-        assertEq(locker.claimable(bob, address(token0)), 0, "bob claimable invalid epoch 1");
-        assertEq(locker.claimable(charlie, address(token0)), 0, "charlie claimable invalid epoch 1");
+    function _claimRewardAs(address account_) private {
+        vm.startPrank(account_);
+        locker.claim(account_);
+        vm.stopPrank();
+    }
 
-        // epoch 2
-        vm.warp(1715817600);
+    function test_distributeRewardToken_Claimables() public {
+        _addRewardToken(address(token0));
+        _addRewardToken(address(token1));
 
-        assertEq(locker.claimable(alice, address(token0)), 10 ether, "alice claimable invalid epoch 2.1");
-        assertEq(locker.claimable(bob, address(token0)), 0, "bob claimable invalid epoch 2.1");
-        assertEq(locker.claimable(charlie, address(token0)), 0, "charlie claimable invalid epoch 2.1");
+        _lockNFTAs(alice);
+        _lockNFTAs(bob);
+
+        // Epoch 1
+        _distributeRewardToken(token0, 10 ether);
+        _distributeRewardToken(token1, 10 ether);
+
+        assertEq(locker.claimable(alice, address(token0)), 5 ether, "alice claimable invalid epoch 1");
+        assertEq(locker.claimable(bob, address(token0)), 5 ether, "bob claimable invalid epoch 1");
+        assertEq(locker.claimable(alice, address(token1)), 5 ether, "alice claimable invalid epoch 1");
+        assertEq(locker.claimable(bob, address(token1)), 5 ether, "bob claimable invalid epoch 1");
+
+        // Epoch 2
+        _lockNFTAs(alice);
+        _distributeRewardToken(token0, 3 ether);
+
+        assertEq(locker.claimable(alice, address(token0)), 7 ether, "alice claimable invalid epoch 2");
+        assertEq(locker.claimable(bob, address(token0)), 6 ether, "bob claimable invalid epoch 2");
+        assertEq(locker.claimable(alice, address(token1)), 5 ether, "alice claimable invalid epoch 1");
+        assertEq(locker.claimable(bob, address(token1)), 5 ether, "bob claimable invalid epoch 1");
+
+        // Claim
+        _claimRewardAs(bob);
+
+        assertEq(token0.balanceOf(bob), 6 ether, "invalid bob balance token0");
+        assertEq(token1.balanceOf(bob), 5 ether, "invalid bob balance token1");
+
+        assertEq(locker.claimable(alice, address(token0)), 7 ether, "alice claimable invalid epoch 2");
+        assertEq(locker.claimable(bob, address(token0)), 0, "bob claimable invalid epoch 2");
+        assertEq(locker.claimable(alice, address(token1)), 5 ether, "alice claimable invalid epoch 1");
+        assertEq(locker.claimable(bob, address(token1)), 0, "bob claimable invalid epoch 1");
     }
 
     function test_distributeRewardToken_Unauthorized() public {

@@ -20,7 +20,6 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
     using Math for uint256;
 
     IERC721 public nft;
-    address[] public rewardTokens;
     uint256 public constant EPOCH_DURATION = 7 days;
     uint256 public constant LOCK_DURATION_IN_EPOCH = 4; // 4 epochs
 
@@ -34,42 +33,24 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
         uint256 amount;
     }
 
-    struct Shares {
-        uint256 prevShares;
-        uint256 epoch;
-        uint256 nextShares;
-    }
-
-    struct RewardIndex {
-        int256 prevIndex;
-        uint256 epoch;
-        int256 nextIndex;
-    }
-
-    struct RewardPerShare {
-        uint256 value;
-        uint256 updatedAt;
-    }
-
     mapping(uint256 tokenId => NFTLock lock) public locks;
-    mapping(address account => Shares shares) private accountShares;
-    mapping(address account => mapping(address token => RewardIndex index)) private rewardIndices;
-    mapping(address token => RewardPerShare rps) private rewardPerShares;
+    mapping(address account => uint256 shares) private accountShares;
+    mapping(address account => mapping(address token => int256 index)) private rewardIndices;
     mapping(address account => mapping(address token => uint256 amount)) private claimedRewards;
 
-    Shares private totalShares;
+    address[] public rewardTokens;
+    mapping(address token => bool valid) private isValidRewardToken;
+    mapping(address token => uint256 rps) private rewardPerShares;
+    uint256 private totalShares;
 
-    // TODO(pyk): check variables below
-
-    error RenounceInvalid();
-
+    error InvalidAction();
     error InvalidTokenCount();
     error InvalidLockOwner();
     error InvalidUnlockWindow();
     error InvalidRewardToken();
     error InvalidRewardAmount();
-    error InvalidAccountShareDecrease();
     error InvalidTotalShares();
+    error InvalidRecipient();
 
     event NewRewardTokens(address[] token);
     event RewardDistributed(IERC20 token, uint256 amount);
@@ -82,85 +63,20 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
 
     /// @dev This contract ain't gonna work without its owner, ya know?
     function renounceOwnership() public virtual override onlyOwner {
-        revert RenounceInvalid();
-    }
-
-    function _getCurrentEpochStart() private view returns (uint256) {
-        uint256 start = ((block.timestamp / EPOCH_DURATION) * EPOCH_DURATION);
-        return start;
-    }
-
-    function _getNextEpochStart() private view returns (uint256) {
-        return _getCurrentEpochStart() + EPOCH_DURATION;
-    }
-
-    function getShares(address account_) public view returns (uint256 shares) {
-        Shares memory accountShare = accountShares[account_];
-        if (block.timestamp < accountShare.epoch) {
-            shares = accountShare.prevShares;
-        } else {
-            shares = accountShare.nextShares;
-        }
-    }
-
-    function getTotalShares() public view returns (uint256 shares) {
-        if (block.timestamp < totalShares.epoch) {
-            shares = totalShares.prevShares;
-        } else {
-            shares = totalShares.nextShares;
-        }
-    }
-
-    function _getRewardIndex(address account_, address token_) private view returns (int256 index) {
-        RewardIndex memory rewardIndex = rewardIndices[account_][token_];
-        Shares memory accountShare = accountShares[account_];
-        RewardPerShare memory rps = rewardPerShares[token_];
-
-        // If the user have pending shares when admin distribute the reward token
-        // then it's mean that the user lock the NFT before rewardPerShare is updated;
-        // hence we need to calculate the reward index manually to adjust claimable amount
-        // of the user
-        if (accountShare.epoch > rps.updatedAt) {
-            index = -rps.value.mulDiv(accountShare.nextShares, 1 ether, Math.Rounding.Floor).toInt256();
-        } else {
-            if (block.timestamp < rewardIndex.epoch) {
-                index = rewardIndex.prevIndex;
-            } else {
-                index = rewardIndex.nextIndex;
-            }
-        }
+        revert InvalidAction();
     }
 
     function _increaseShares(address account_, uint256 tokenCount_) private {
-        uint256 currentEpochStart = _getCurrentEpochStart();
-        uint256 nextEpochStart = currentEpochStart + EPOCH_DURATION;
         uint256 amount = tokenCount_ * 1 ether;
 
-        Shares storage accountShare = accountShares[account_];
-
-        if (accountShare.epoch <= currentEpochStart) {
-            accountShare.prevShares = accountShare.nextShares;
-        }
-        accountShare.epoch = nextEpochStart;
-        accountShare.nextShares += amount;
-
-        if (totalShares.epoch <= currentEpochStart) {
-            totalShares.prevShares = totalShares.nextShares;
-        }
-        totalShares.epoch = nextEpochStart;
-        totalShares.nextShares += amount;
+        accountShares[account_] += amount;
+        totalShares += amount;
 
         uint256 rewardTokenCount = rewardTokens.length;
         for (uint256 i = 0; i < rewardTokenCount; ++i) {
             address rewardToken = rewardTokens[i];
-            uint256 rewardPerShare = rewardPerShares[rewardToken].value;
-            RewardIndex storage index = rewardIndices[account_][rewardToken];
-
-            if (index.epoch <= currentEpochStart) {
-                index.prevIndex = index.nextIndex;
-            }
-            index.epoch = nextEpochStart;
-            index.nextIndex -= rewardPerShare.mulDiv(amount, 1 ether).toInt256();
+            uint256 rewardPerShare = rewardPerShares[rewardToken];
+            rewardIndices[account_][rewardToken] -= rewardPerShare.mulDiv(amount, 1 ether).toInt256();
         }
     }
 
@@ -183,26 +99,17 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
     }
 
     function _decreaseShares(address account_, uint256 tokenCount_) private {
-        uint256 currentEpochStart = _getCurrentEpochStart();
         uint256 amount = tokenCount_ * 1 ether;
-        uint256 shares = getShares(account_);
-        if (shares < amount) revert InvalidAccountShareDecrease();
 
-        Shares storage accountShare = accountShares[account_];
-        if (accountShare.epoch == 0) revert InvalidAccountShareDecrease();
+        accountShares[account_] -= amount;
+        totalShares -= amount;
 
-        uint256 newShares = shares - amount;
-        accountShare.epoch = currentEpochStart;
-        accountShare.prevShares = newShares;
-        accountShare.nextShares = newShares;
-
-        uint256 currentTotalShares = getTotalShares();
-
-        if (currentTotalShares < amount) revert InvalidAccountShareDecrease();
-        uint256 newTotalShares = currentTotalShares - amount;
-        totalShares.prevShares = newTotalShares;
-        totalShares.epoch = currentEpochStart;
-        totalShares.nextShares = newTotalShares;
+        uint256 rewardTokenCount = rewardTokens.length;
+        for (uint256 i = 0; i < rewardTokenCount; ++i) {
+            address rewardToken = rewardTokens[i];
+            uint256 rewardPerShare = rewardPerShares[rewardToken];
+            rewardIndices[account_][rewardToken] += rewardPerShare.mulDiv(amount, 1 ether).toInt256();
+        }
     }
 
     function _unlockNFT(address owner_, uint256 tokenId_) internal {
@@ -227,27 +134,23 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
             _unlockNFT(msg.sender, tokenIds_[i]);
         }
 
-        // TODO(pyk): claim rewards here
-
+        claim(msg.sender);
         _decreaseShares(msg.sender, tokenIdCount);
-
         emit NewUnlocks(msg.sender, tokenIds_);
     }
 
     function _addRewardToken(address token_) private {
         if (address(token_) == address(0)) revert InvalidRewardToken();
-        if (rewardPerShares[token_].updatedAt > 0) revert InvalidRewardToken();
+        if (isValidRewardToken[token_] == true) revert InvalidRewardToken(); // can't add twice
 
         rewardTokens.push(token_);
-
-        RewardPerShare storage rps = rewardPerShares[token_];
-        rps.value = 0;
-        rps.updatedAt = block.timestamp;
+        isValidRewardToken[token_] = true;
     }
 
     function addRewardTokens(address[] memory tokens_) external onlyOwner {
         uint256 tokenCount = tokens_.length;
         if (tokenCount == 0) revert InvalidTokenCount();
+
         for (uint256 i = 0; i < tokens_.length; i++) {
             _addRewardToken(tokens_[i]);
         }
@@ -260,26 +163,20 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
     }
 
     function distributeRewardToken(address token_, uint256 amount_) external onlyOwner {
-        if (rewardPerShares[token_].updatedAt == 0) revert InvalidRewardToken();
+        if (!isValidRewardToken[token_]) revert InvalidRewardToken();
         if (amount_ == 0) revert InvalidRewardAmount();
-
-        uint256 totalSharesAtCurrentEpoch = getTotalShares();
-        if (totalSharesAtCurrentEpoch == 0) revert InvalidTotalShares();
-
-        RewardPerShare storage rps = rewardPerShares[token_];
-        rps.value += amount_.mulDiv(1 ether, totalSharesAtCurrentEpoch, Math.Rounding.Floor);
-        rps.updatedAt = block.timestamp;
+        if (totalShares == 0) revert InvalidTotalShares();
+        rewardPerShares[token_] += amount_.mulDiv(1 ether, totalShares, Math.Rounding.Floor);
+        IERC20(token_).safeTransferFrom(msg.sender, address(this), amount_);
     }
 
     function claimable(address account_, address token_) public view returns (uint256 amount) {
-        if (rewardPerShares[token_].updatedAt == 0) revert InvalidRewardToken();
-
-        uint256 shares = getShares(account_);
+        if (!isValidRewardToken[token_]) revert InvalidRewardToken();
+        uint256 shares = accountShares[account_];
         if (shares == 0) return 0;
-
-        int256 rewardIndex = _getRewardIndex(account_, token_);
+        int256 rewardIndex = rewardIndices[account_][token_];
         uint256 claimedAmount = claimedRewards[account_][token_];
-        uint256 rewardPerShare = rewardPerShares[token_].value;
+        uint256 rewardPerShare = rewardPerShares[token_];
         int256 totalRewardAmount = rewardPerShare.mulDiv(shares, 1 ether, Math.Rounding.Floor).toInt256() + rewardIndex;
         amount = uint256(totalRewardAmount) - claimedAmount;
     }
@@ -287,9 +184,33 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
     function claimables(address account_) public view returns (Claimable[] memory results) {
         uint256 rewardTokenCount = rewardTokens.length;
         results = new Claimable[](rewardTokenCount);
-        for (uint256 i = 0; i < rewardTokenCount; i++) {
+        for (uint256 i = 0; i < rewardTokenCount; ++i) {
             address token = rewardTokens[i];
             uint256 amount = claimable(account_, token);
+            results[i] = Claimable({token: token, amount: amount});
+        }
+    }
+
+    function claim(address recipient_) public returns (Claimable[] memory results) {
+        if (recipient_ == address(0)) revert InvalidRecipient();
+
+        results = claimables(msg.sender);
+        uint256 resultsCount = results.length;
+        for (uint256 i = 0; i < resultsCount; ++i) {
+            Claimable memory result = results[i];
+            if (result.amount > 0) {
+                IERC20(result.token).safeTransfer(recipient_, result.amount);
+                claimedRewards[msg.sender][result.token] += result.amount;
+            }
+        }
+    }
+
+    function getClaimedRewards(address account_) external view returns (Claimable[] memory results) {
+        uint256 rewardTokenCount = rewardTokens.length;
+        results = new Claimable[](rewardTokenCount);
+        for (uint256 i = 0; i < rewardTokenCount; ++i) {
+            address token = rewardTokens[i];
+            uint256 amount = claimedRewards[account_][token];
             results[i] = Claimable({token: token, amount: amount});
         }
     }
