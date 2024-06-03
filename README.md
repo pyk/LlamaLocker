@@ -80,7 +80,7 @@ Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 1.76ms (1.22ms CPU 
 Ran 4 test suites in 513.25ms (5.90ms CPU time): 16 tests passed, 0 failed, 0 skipped (16 total tests)
 ```
 
-## Generate Merkle Root
+## Generate Merkle Tree
 
 Install dependencies:
 
@@ -90,11 +90,13 @@ pnpm install
 
 Update the `whitelist.txt` file.
 
-Then get the merkle root via the following command:
+Then get the merkle tree root and proofs via the following command:
 
 ```sh
 pnpm run gen:merkle
 ```
+
+Check the proof inside `merkle-proofs.json`.
 
 ## Front End Integration
 

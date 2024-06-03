@@ -18,6 +18,13 @@ async function main() {
   const tree = StandardMerkleTree.of(values, ["address", "uint256"]);
   console.log("Total whitelisted address:", values.length);
   console.log("Merkle Root:", tree.root);
+  const proofs: { address: string; proof: string[] }[] = [];
+  for (const [i, v] of tree.entries()) {
+    const address = v[0];
+    const proof = tree.getProof(i);
+    proofs.push({ address, proof });
+  }
+  fs.writeFileSync("merkle-proofs.json", JSON.stringify(proofs));
 }
 
 main();
