@@ -1,0 +1,13 @@
+{
+  "name": "llamalocker",
+  "version": "1.0.0",
+  "scripts": {
+    "gen:merkle": "tsx script/generate-merkle-tree.ts"
+  },
+  "packageManager": "pnpm@8.6.5+sha1.a074a371066567dcdeb19a1d1bd9a78cf3c9faa3",
+  "devDependencies": {
+    "@openzeppelin/merkle-tree": "1.0.6",
+    "@types/node": "20.14.0",
+    "tsx": "4.11.2"
+  }
+}
