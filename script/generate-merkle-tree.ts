@@ -16,6 +16,7 @@ async function main() {
   }
 
   const tree = StandardMerkleTree.of(values, ["address", "uint256"]);
+  console.log("Total whitelisted address:", values.length);
   console.log("Merkle Root:", tree.root);
 }
 
