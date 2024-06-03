@@ -47,37 +47,50 @@ Example output:
 ```
 $ forge test
 [⠊] Compiling...
-No files changed, compilation skipped
+[⠘] Compiling 1 files with Solc 0.8.23
+[⠃] Solc 0.8.23 finished in 1.81s
+Compiler run successful!
+
+Ran 8 tests for test/Whitelist.t.sol:RewardDistributionTest
+[PASS] test_disableWhitelist_InvalidAction() (gas: 20255)
+[PASS] test_disableWhitelist_Unauthorized() (gas: 13677)
+[PASS] test_disableWhitelist_Valid() (gas: 19431)
+[PASS] test_lock_InvalidAction() (gas: 115236)
+[PASS] test_lock_Valid() (gas: 222819)
+[PASS] test_setRoot_InvalidAction() (gas: 15605)
+[PASS] test_setRoot_Unauthorized() (gas: 13717)
+[PASS] test_setRoot_Valid() (gas: 19647)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 10.53ms (848.79µs CPU time)
 
 Ran 1 test for test/LlamaLocker.t.sol:LlamaLockerTest
 [PASS] test_renounceOwnership_InvalidAction() (gas: 13344)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.21ms (61.08µs CPU time)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 10.54ms (480.79µs CPU time)
 
 Ran 4 tests for test/AddRewardTokens.t.sol:AddRewardTokensTest
-[PASS] test_addRewardTokens_InvalidRewardToken() (gas: 92123)
-[PASS] test_addRewardTokens_InvalidRewardTokenCount() (gas: 13930)
-[PASS] test_addRewardTokens_Unauthorized() (gas: 14167)
-[PASS] test_addRewardTokens_Valid() (gas: 133253)
-Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 1.37ms (325.04µs CPU time)
-
-Ran 6 tests for test/LockMechanism.t.sol:LockMechanismTest
-[PASS] test_lock_InvalidTokenCount() (gas: 9181)
-[PASS] test_lock_Valid() (gas: 448617)
-[PASS] test_unlock_InvalidLockOwner() (gas: 223227)
-[PASS] test_unlock_InvalidTokenCount() (gas: 9181)
-[PASS] test_unlock_InvalidUnlockWindow() (gas: 243021)
-[PASS] test_unlock_ValidUnlockWindow() (gas: 215742)
-Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 1.56ms (1.02ms CPU time)
+[PASS] test_addRewardTokens_InvalidRewardToken() (gas: 92126)
+[PASS] test_addRewardTokens_InvalidRewardTokenCount() (gas: 13931)
+[PASS] test_addRewardTokens_Unauthorized() (gas: 14168)
+[PASS] test_addRewardTokens_Valid() (gas: 133254)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 9.61ms (987.75µs CPU time)
 
 Ran 5 tests for test/RewardDistribution.t.sol:RewardDistributionTest
-[PASS] test_distributeRewardToken_Claimables() (gas: 968837)
-[PASS] test_distributeRewardToken_InvalidRewardAmount() (gas: 134450)
-[PASS] test_distributeRewardToken_InvalidRewardToken() (gas: 17532)
-[PASS] test_distributeRewardToken_InvalidTotalShares() (gas: 136540)
-[PASS] test_distributeRewardToken_Unauthorized() (gas: 13833)
-Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 1.76ms (1.22ms CPU time)
+[PASS] test_distributeRewardToken_Claimables() (gas: 971608)
+[PASS] test_distributeRewardToken_InvalidRewardAmount() (gas: 134452)
+[PASS] test_distributeRewardToken_InvalidRewardToken() (gas: 17533)
+[PASS] test_distributeRewardToken_InvalidTotalShares() (gas: 136542)
+[PASS] test_distributeRewardToken_Unauthorized() (gas: 13834)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 10.59ms (1.80ms CPU time)
 
-Ran 4 test suites in 513.25ms (5.90ms CPU time): 16 tests passed, 0 failed, 0 skipped (16 total tests)
+Ran 6 tests for test/LockMechanism.t.sol:LockMechanismTest
+[PASS] test_lock_InvalidTokenCount() (gas: 11476)
+[PASS] test_lock_Valid() (gas: 449598)
+[PASS] test_unlock_InvalidLockOwner() (gas: 223593)
+[PASS] test_unlock_InvalidTokenCount() (gas: 9220)
+[PASS] test_unlock_InvalidUnlockWindow() (gas: 243582)
+[PASS] test_unlock_ValidUnlockWindow() (gas: 216046)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 9.69ms (1.18ms CPU time)
+
+Ran 5 test suites in 719.53ms (50.95ms CPU time): 24 tests passed, 0 failed, 0 skipped (24 total tests)
 ```
 
 ## Generate Merkle Tree
@@ -102,7 +115,8 @@ Check the proof inside `merkle-proofs.json`.
 
 There are two main actions for users:
 
-1. **Lock NFT:** Users can lock their NFT via `lock`.
+1. **Lock NFT:** Users can lock their NFT via `lock(proofs, tokenIds)`
+   for whitelisted user and `lock(tokenIds)` for public.
 2. **Unlock NFT:** Users can unlock their NFT via `unlock`.
 
 Additional information:
@@ -124,8 +138,10 @@ unlockEnd = unlockStart + EPOCH_DURATION
 
 `unlockStart` and `unlockEnd` define a time window in Unix timestamp when users can unlock their locked NFTs.
 
-## Admin Chores
+Admin actions:
 
-- Admins can add a new reward token via `addRewardToken`.
-- Admins can distribute weekly rewards via `distributeRewardToken`.
-- Admins need to approve the LlamaLocker contract before executing `distributeRewardToken`.
+- Admin can add a new reward token via `addRewardToken`.
+- Admin can distribute weekly rewards via `distributeRewardToken`.
+- Admin need to approve the LlamaLocker contract before executing `distributeRewardToken`.
+- Admin can set new merkle tree root via `setRoot(root)` (for rolling whitelist)
+- Admin can disable the whitelist via `disableWhitelist()` (for public launch)

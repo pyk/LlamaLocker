@@ -6,6 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {ERC721Holder} from "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
+import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
@@ -18,6 +19,9 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
     using SafeERC20 for IERC20;
     using SafeCast for uint256;
     using Math for uint256;
+
+    bytes32 public root;
+    bool public whitelistDisabled;
 
     IERC721 public nft;
     uint256 public constant EPOCH_DURATION = 7 days;
@@ -56,14 +60,29 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
     event RewardDistributed(IERC20 token, uint256 amount);
     event NewLocks(address owner, uint256[] tokenIds);
     event NewUnlocks(address owner, uint256[] tokenIds);
+    event WhitelistDisabled();
+    event NewRoot(bytes32 root);
 
-    constructor(address owner_, address nft_) Ownable(owner_) {
+    constructor(address owner_, address nft_, bytes32 root_) Ownable(owner_) {
         nft = IERC721(nft_);
+        root = root_;
     }
 
     /// @dev This contract ain't gonna work without its owner, ya know?
     function renounceOwnership() public virtual override onlyOwner {
         revert InvalidAction();
+    }
+
+    function setRoot(bytes32 root_) external onlyOwner {
+        if (root_ == root) revert InvalidAction();
+        root = root_;
+        emit NewRoot(root);
+    }
+
+    function disableWhitelist() external onlyOwner {
+        if (whitelistDisabled) revert InvalidAction();
+        whitelistDisabled = true;
+        emit WhitelistDisabled();
     }
 
     function _increaseShares(address account_, uint256 tokenCount_) private {
@@ -85,17 +104,29 @@ contract LlamaLocker is ERC721Holder, Ownable2Step {
         locks[tokenId_] = NFTLock({owner: owner_, lockedAt: block.timestamp});
     }
 
-    function lock(uint256[] calldata tokenIds_) external {
+    function _lock(address owner_, uint256[] calldata tokenIds_) private {
         uint256 tokenIdCount = tokenIds_.length;
         if (tokenIdCount == 0) revert InvalidTokenCount();
 
-        _increaseShares(msg.sender, tokenIdCount);
+        _increaseShares(owner_, tokenIdCount);
 
         for (uint8 i = 0; i < tokenIdCount; ++i) {
-            _lockNFT(msg.sender, tokenIds_[i]);
+            _lockNFT(owner_, tokenIds_[i]);
         }
 
-        emit NewLocks(msg.sender, tokenIds_);
+        emit NewLocks(owner_, tokenIds_);
+    }
+
+    function lock(bytes32[] memory proof_, uint256[] calldata tokenIds_) external {
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(msg.sender, 0))));
+        bool notWhitelisted = !MerkleProof.verify(proof_, root, leaf);
+        if (notWhitelisted) revert InvalidAction();
+        _lock(msg.sender, tokenIds_);
+    }
+
+    function lock(uint256[] calldata tokenIds_) external {
+        if (!whitelistDisabled) revert InvalidAction();
+        _lock(msg.sender, tokenIds_);
     }
 
     function _decreaseShares(address account_, uint256 tokenCount_) private {

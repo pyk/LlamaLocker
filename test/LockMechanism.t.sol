@@ -16,7 +16,12 @@ contract LockMechanismTest is Test {
 
     function setUp() public {
         nft = new MockNFT();
-        locker = new LlamaLocker(admin, address(nft));
+        locker =
+            new LlamaLocker(admin, address(nft), 0x308b32884ae9d1e08a3e1d00ac6934fa79bf7ae30358cff55dda90c8aebedf9c);
+
+        vm.startPrank(admin);
+        locker.disableWhitelist();
+        vm.stopPrank();
     }
 
     function test_lock_Valid() public {
