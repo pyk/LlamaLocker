@@ -31,6 +31,7 @@ contract LlamaLocker is ERC721Holder, Ownable2Step, ReentrancyGuard {
     struct NFTLock {
         address owner;
         uint256 lockedAt;
+        uint256 tokenId;
     }
 
     struct Claimable {
@@ -102,7 +103,7 @@ contract LlamaLocker is ERC721Holder, Ownable2Step, ReentrancyGuard {
 
     function _lockNFT(address owner_, uint256 tokenId_) private {
         nft.safeTransferFrom(owner_, address(this), tokenId_);
-        locks[tokenId_] = NFTLock({owner: owner_, lockedAt: block.timestamp});
+        locks[tokenId_] = NFTLock({owner: owner_, lockedAt: block.timestamp, tokenId: tokenId_});
     }
 
     function _lock(address owner_, uint256[] calldata tokenIds_) private {
@@ -155,7 +156,7 @@ contract LlamaLocker is ERC721Holder, Ownable2Step, ReentrancyGuard {
         uint256 modulo = lockedDurationInEpoch % LOCK_DURATION_IN_EPOCH;
         if (modulo != 0) revert InvalidUnlockWindow();
 
-        locks[tokenId_] = NFTLock({owner: address(0), lockedAt: 0});
+        locks[tokenId_] = NFTLock({owner: address(0), lockedAt: 0, tokenId: 0});
         nft.safeTransferFrom(address(this), owner_, tokenId_);
     }
 
@@ -245,6 +246,50 @@ contract LlamaLocker is ERC721Holder, Ownable2Step, ReentrancyGuard {
             address token = rewardTokens[i];
             uint256 amount = claimedRewards[account_][token];
             results[i] = Claimable({token: token, amount: amount});
+        }
+    }
+
+    /// @dev Used for offchain only
+    function getLocks() external view returns (NFTLock[] memory results) {
+        uint256 lockedCount = 0;
+        uint256 maxSupply = 1111;
+
+        for (uint256 _tokenId = 0; _tokenId < maxSupply; _tokenId++) {
+            NFTLock memory locked = locks[_tokenId];
+            if (locked.owner == address(0)) continue;
+            lockedCount++;
+        }
+
+        results = new NFTLock[](lockedCount);
+        uint256 index = 0;
+        for (uint256 _tokenId = 0; _tokenId < maxSupply; _tokenId++) {
+            NFTLock memory locked = locks[_tokenId];
+            if (locked.owner == address(0)) continue;
+            results[index] = locked;
+            index++;
+        }
+    }
+
+    /// @dev Used for offchain only
+    function getLocksByOwner(address owner_) external view returns (NFTLock[] memory results) {
+        uint256 lockedCount = 0;
+        uint256 maxSupply = 1111;
+
+        for (uint256 _tokenId = 0; _tokenId < maxSupply; _tokenId++) {
+            NFTLock memory locked = locks[_tokenId];
+            if (locked.owner == address(0)) continue;
+            if (locked.owner != owner_) continue;
+            lockedCount++;
+        }
+
+        results = new NFTLock[](lockedCount);
+        uint256 index = 0;
+        for (uint256 _tokenId = 0; _tokenId < maxSupply; _tokenId++) {
+            NFTLock memory locked = locks[_tokenId];
+            if (locked.owner == address(0)) continue;
+            if (locked.owner != owner_) continue;
+            results[index] = locked;
+            index++;
         }
     }
 }

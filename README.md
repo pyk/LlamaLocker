@@ -47,50 +47,54 @@ Example output:
 ```
 $ forge test
 [⠊] Compiling...
-[⠘] Compiling 1 files with Solc 0.8.23
-[⠃] Solc 0.8.23 finished in 1.81s
+[⠑] Compiling 1 files with Solc 0.8.23
+[⠘] Solc 0.8.23 finished in 1.71s
 Compiler run successful!
 
-Ran 8 tests for test/Whitelist.t.sol:RewardDistributionTest
-[PASS] test_disableWhitelist_InvalidAction() (gas: 20255)
-[PASS] test_disableWhitelist_Unauthorized() (gas: 13677)
-[PASS] test_disableWhitelist_Valid() (gas: 19431)
-[PASS] test_lock_InvalidAction() (gas: 115236)
-[PASS] test_lock_Valid() (gas: 222819)
-[PASS] test_setRoot_InvalidAction() (gas: 15605)
-[PASS] test_setRoot_Unauthorized() (gas: 13717)
-[PASS] test_setRoot_Valid() (gas: 19647)
-Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 10.53ms (848.79µs CPU time)
-
 Ran 1 test for test/LlamaLocker.t.sol:LlamaLockerTest
-[PASS] test_renounceOwnership_InvalidAction() (gas: 13344)
-Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 10.54ms (480.79µs CPU time)
+[PASS] test_renounceOwnership_InvalidAction() (gas: 13389)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 1.44ms (93.38µs CPU time)
 
 Ran 4 tests for test/AddRewardTokens.t.sol:AddRewardTokensTest
-[PASS] test_addRewardTokens_InvalidRewardToken() (gas: 92126)
-[PASS] test_addRewardTokens_InvalidRewardTokenCount() (gas: 13931)
-[PASS] test_addRewardTokens_Unauthorized() (gas: 14168)
-[PASS] test_addRewardTokens_Valid() (gas: 133254)
-Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 9.61ms (987.75µs CPU time)
+[PASS] test_addRewardTokens_InvalidRewardToken() (gas: 92195)
+[PASS] test_addRewardTokens_InvalidRewardTokenCount() (gas: 13954)
+[PASS] test_addRewardTokens_Unauthorized() (gas: 14191)
+[PASS] test_addRewardTokens_Valid() (gas: 133255)
+Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 1.60ms (179.63µs CPU time)
 
-Ran 5 tests for test/RewardDistribution.t.sol:RewardDistributionTest
-[PASS] test_distributeRewardToken_Claimables() (gas: 971608)
-[PASS] test_distributeRewardToken_InvalidRewardAmount() (gas: 134452)
-[PASS] test_distributeRewardToken_InvalidRewardToken() (gas: 17533)
-[PASS] test_distributeRewardToken_InvalidTotalShares() (gas: 136542)
-[PASS] test_distributeRewardToken_Unauthorized() (gas: 13834)
-Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 10.59ms (1.80ms CPU time)
+Ran 8 tests for test/Whitelist.t.sol:RewardDistributionTest
+[PASS] test_disableWhitelist_InvalidAction() (gas: 20211)
+[PASS] test_disableWhitelist_Unauthorized() (gas: 13655)
+[PASS] test_disableWhitelist_Valid() (gas: 19409)
+[PASS] test_lock_InvalidAction() (gas: 115192)
+[PASS] test_lock_Valid() (gas: 225023)
+[PASS] test_setRoot_InvalidAction() (gas: 15583)
+[PASS] test_setRoot_Unauthorized() (gas: 13695)
+[PASS] test_setRoot_Valid() (gas: 19625)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 1.65ms (751.29µs CPU time)
 
 Ran 6 tests for test/LockMechanism.t.sol:LockMechanismTest
-[PASS] test_lock_InvalidTokenCount() (gas: 11476)
-[PASS] test_lock_Valid() (gas: 449598)
-[PASS] test_unlock_InvalidLockOwner() (gas: 223593)
-[PASS] test_unlock_InvalidTokenCount() (gas: 9220)
-[PASS] test_unlock_InvalidUnlockWindow() (gas: 243582)
-[PASS] test_unlock_ValidUnlockWindow() (gas: 216046)
-Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 9.69ms (1.18ms CPU time)
+[PASS] test_lock_InvalidTokenCount() (gas: 11454)
+[PASS] test_lock_Valid() (gas: 496076)
+[PASS] test_unlock_InvalidLockOwner() (gas: 225991)
+[PASS] test_unlock_InvalidTokenCount() (gas: 9265)
+[PASS] test_unlock_InvalidUnlockWindow() (gas: 246840)
+[PASS] test_unlock_ValidUnlockWindow() (gas: 222618)
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 1.71ms (784.38µs CPU time)
 
-Ran 5 test suites in 719.53ms (50.95ms CPU time): 24 tests passed, 0 failed, 0 skipped (24 total tests)
+Ran 5 tests for test/RewardDistribution.t.sol:RewardDistributionTest
+[PASS] test_distributeRewardToken_Claimables() (gas: 1020171)
+[PASS] test_distributeRewardToken_InvalidRewardAmount() (gas: 134541)
+[PASS] test_distributeRewardToken_InvalidRewardToken() (gas: 17599)
+[PASS] test_distributeRewardToken_InvalidTotalShares() (gas: 136631)
+[PASS] test_distributeRewardToken_Unauthorized() (gas: 13900)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 2.06ms (1.10ms CPU time)
+
+Ran 1 test for test/OffchainQuery.sol:LockMechanismTest
+[PASS] test_getLocks() (gas: 11133290)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 11.34ms (9.86ms CPU time)
+
+Ran 6 test suites in 161.35ms (19.81ms CPU time): 25 tests passed, 0 failed, 0 skipped (25 total tests)
 ```
 
 ## Generate Merkle Tree
