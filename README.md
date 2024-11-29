@@ -149,3 +149,34 @@ Admin actions:
 - Admin need to approve the LlamaLocker contract before executing `distributeRewardToken`.
 - Admin can set new merkle tree root via `setRoot(root)` (for rolling whitelist)
 - Admin can disable the whitelist via `disableWhitelist()` (for public launch)
+
+## Gas Report
+
+```
+| src/LlamaLocker.sol:LlamaLocker contract |                 |         |         |         |         |
+|------------------------------------------|-----------------|---------|---------|---------|---------|
+| Deployment Cost                          | Deployment Size |         |         |         |         |
+| 2020278                                  | 9131            |         |         |         |         |
+| Function Name                            | min             | avg     | median  | max     | # calls |
+| addRewardTokens                          | 24227           | 78136   | 84896   | 139290  | 10      |
+| claim                                    | 162883          | 162883  | 162883  | 162883  | 1       |
+| claimable                                | 2401            | 3067    | 2401    | 4401    | 12      |
+| disableWhitelist                         | 23478           | 28734   | 29335   | 29335   | 16      |
+| distributeRewardToken                    | 24051           | 45139   | 28627   | 81528   | 7       |
+| getLocks                                 | 8018452         | 8018452 | 8018452 | 8018452 | 1       |
+| getLocksByOwner                          | 1364152         | 1364152 | 1364152 | 1364152 | 2       |
+| getRewardTokenCount                      | 370             | 370     | 370     | 370     | 1       |
+| lock(bytes32[],uint256[])                | 26080           | 95257   | 95257   | 164435  | 2       |
+| lock(uint256[])                          | 24103           | 147342  | 160540  | 183588  | 12      |
+| renounceOwnership                        | 23504           | 23504   | 23504   | 23504   | 1       |
+| root                                     | 350             | 350     | 350     | 350     | 1       |
+| setRoot                                  | 24077           | 26788   | 26180   | 30107   | 3       |
+| unlock                                   | 21914           | 33682   | 28960   | 78956   | 9       |
+| whitelistDisabled                        | 378             | 378     | 378     | 378     | 1       |
+```
+
+Assuming gas fee is 10gwei:
+
+- `claim`: 0,00000001 * 162883 = 0,00162883 ETH
+- `lock(bytes32[],uint256[])`: 0,00000001 * 95257 = 0,00095257 ETH
+- `unlock`: 0,00000001 * 33682 = 0,00033682 ETH
