@@ -177,6 +177,7 @@ Admin actions:
 
 Assuming gas fee is 10gwei:
 
+- Deployment: 0,00000001 * 2020278 = 0,02020278 ETH
 - `claim`: 0,00000001 * 162883 = 0,00162883 ETH
 - `lock(bytes32[],uint256[])` (lock for whitelisted addy): 0,00000001 * 95257 = 0,00095257 ETH
 - `lock(uint256[])`: 0,00000001 * 147342 = 0,00147342 ETH
